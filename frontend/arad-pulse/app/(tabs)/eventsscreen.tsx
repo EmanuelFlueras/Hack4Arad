@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { eventService, BackendEvent } from '../../services/eventService';
 
 // Configurare limbă română pentru calendar
@@ -311,13 +312,36 @@ export default function EventsScreen() {
 
                 {item.partners && item.partners.length > 0 && (
                   <View style={styles.partnersSection}>
-                    <Text style={styles.partnersTitle}>Producători locali parteneri:</Text>
+                    <View style={styles.partnersHeading}>
+                      <Ionicons name="storefront-outline" size={15} color="#047857" />
+                      <Text style={styles.partnersTitle}>Producători locali prezenți:</Text>
+                    </View>
                     <View style={styles.partnersRow}>
                       {item.partners.map((partner) => (
-                        <View key={partner.id} style={styles.partnerTag}>
-                          <Ionicons name="ribbon-outline" size={12} color="#1E293B" />
-                          <Text style={styles.partnerTagText}>{partner.name}</Text>
-                        </View>
+                        <TouchableOpacity
+                          key={partner.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Vezi ${partner.name} pe hartă`}
+                          style={styles.partnerTag}
+                          onPress={() => {
+                            const isMinis = partner.location?.includes('Miniș') ?? false;
+                            router.push({
+                              pathname: '/map',
+                              params: {
+                                focusId: partner.id,
+                                title: partner.name,
+                                lat: isMinis ? 46.1481 : 46.1866,
+                                lng: isMinis ? 21.6142 : 21.3123,
+                              },
+                            });
+                          }}
+                        >
+                          <Text style={styles.partnerTagText}>
+                            {partner.category
+                              ? `${partner.name} (${partner.category})`
+                              : partner.name}
+                          </Text>
+                        </TouchableOpacity>
                       ))}
                     </View>
                   </View>
@@ -549,11 +573,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
+  partnersHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 7,
+  },
   partnersTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: '#475569',
-    marginBottom: 6,
   },
   partnersRow: {
     flexDirection: 'row',
@@ -561,17 +590,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   partnerTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
+    maxWidth: '100%',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   partnerTagText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#065F46',
   },
 });

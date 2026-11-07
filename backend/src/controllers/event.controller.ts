@@ -8,7 +8,15 @@ export const getEvents = async (req: any, res: Response) => {
     const events = await prisma.event.findMany({
       include: {
         creator: { select: { id: true, name: true, phone: true } },
-        partners: { select: { id: true, name: true, location: true, phone: true } },
+        partners: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            phone: true,
+            location: true,
+          },
+        },
         reviews: true,
       },
       orderBy: { createdAt: 'desc' },

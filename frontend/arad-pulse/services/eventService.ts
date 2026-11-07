@@ -8,11 +8,13 @@ export interface BackendEvent {
   startDate?: string | null;
   endDate?: string | null;
   isTba?: boolean;
-  partners?: {
+  partners?: Array<{
     id: string;
     name: string;
     category?: string;
-  }[];
+    phone?: string;
+    location?: string;
+  }>;
   reviews?: {
     id: string;
     rating: number;
