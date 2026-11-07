@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useLocalSearchParams } from 'expo-router';
+import type MapViewInstance from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import { MapPoint, mapService } from '../../services/mapService';
 
@@ -33,7 +35,13 @@ const filters: { key: PointFilter; label: string }[] = [
 ];
 
 export default function MapScreen() {
+  const { focusId, lat, lng } = useLocalSearchParams<{
+    focusId?: string;
+    lat?: string;
+    lng?: string;
+  }>();
   const [points, setPoints] = useState<MapPoint[]>([]);
+  const [focusRegion, setFocusRegion] = useState<Region | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [filter, setFilter] = useState<PointFilter>('ALL');
   const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
@@ -85,6 +93,32 @@ export default function MapScreen() {
       isActive = false;
     };
   }, []);
+
+  const focusLatitude = lat ? Number.parseFloat(lat) : Number.NaN;
+  const focusLongitude = lng ? Number.parseFloat(lng) : Number.NaN;
+
+  useEffect(() => {
+    if (!focusId || !Number.isFinite(focusLatitude) || !Number.isFinite(focusLongitude)) {
+      return;
+    }
+
+    setFocusRegion({
+      latitude: focusLatitude,
+      longitude: focusLongitude,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
+    });
+
+    const producer = points.find(
+      (point) =>
+        point.type === 'PRODUCER' &&
+        (point.id === focusId || point.id === `producer-${focusId}`),
+    );
+    if (!producer) return;
+
+    setFilter('PRODUCER');
+    setSelectedPoint(producer);
+  }, [focusId, focusLatitude, focusLongitude, points]);
 
   const filteredPoints = points.filter((point) => filter === 'ALL' || point.type === filter);
 
@@ -138,6 +172,7 @@ export default function MapScreen() {
     <NativePointsMap
       points={filteredPoints}
       filter={filter}
+      focusRegion={focusRegion}
       userLocation={userLocation}
       selectedPoint={selectedPoint}
       onFilterChange={selectFilter}
@@ -217,18 +252,30 @@ function WebPointsList({
 function NativePointsMap({
   points,
   filter,
+  focusRegion,
   userLocation,
   selectedPoint,
   onFilterChange,
   onPointSelect,
   onNavigate,
   onClosePreview,
-}: MapViewProps) {
-  const { default: MapView, Marker } = require('react-native-maps') as typeof import('react-native-maps');
+}: MapViewProps & { focusRegion: Region | null }) {
+  const { default: MapViewComponent, Marker } = require('react-native-maps') as typeof import('react-native-maps');
+  const mapRef = useRef<MapViewInstance | null>(null);
+
+  useEffect(() => {
+    if (focusRegion) {
+      mapRef.current?.animateToRegion(focusRegion, 500);
+    }
+  }, [focusRegion]);
 
   return (
     <View style={styles.nativeScreen}>
-      <MapView style={styles.map} initialRegion={INITIAL_REGION}>
+      <MapViewComponent
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={focusRegion ?? INITIAL_REGION}
+      >
         {points.map((point) => {
           const isProducer = point.type === 'PRODUCER';
           const isSelected = selectedPoint?.id === point.id;
@@ -258,7 +305,7 @@ function NativePointsMap({
             </Marker>
           );
         })}
-      </MapView>
+      </MapViewComponent>
 
       <View style={styles.nativeTopOverlay} pointerEvents="box-none">
         <Text style={styles.nativeTitle}>Harta Producătorilor</Text>

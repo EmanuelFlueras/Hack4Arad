@@ -11,11 +11,13 @@ export const getProducers = async (req: Request, res: Response) => {
         name: true,
         phone: true,
         location: true,
+        category: true,
+        createdAt: true,
         receivedReviews: true,
       },
     });
 
-    res.json(producers.map(({ receivedReviews, ...producer }) => ({
+    return res.status(200).json(producers.map(({ receivedReviews, ...producer }) => ({
       ...producer,
       reviewsReceived: receivedReviews,
       averageRating: receivedReviews.length
@@ -23,6 +25,7 @@ export const getProducers = async (req: Request, res: Response) => {
         : 0,
     })));
   } catch (error) {
-    res.status(500).json({ error: 'Eroare la preluarea producatorilor.' });
+    console.error('Failed to fetch producers:', error);
+    return res.status(500).json({ error: 'Nu s-au putut prelua producătorii.' });
   }
 };

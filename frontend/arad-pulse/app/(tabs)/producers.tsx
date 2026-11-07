@@ -7,14 +7,36 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Producer, producerService } from '../../services/producerService';
+import { router } from 'expo-router';
+import { apiRequest } from '../../services/api';
+
+interface Producer {
+  id: string;
+  name: string;
+  phone: string;
+  location: string;
+  category?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+const categories = [
+  'Toate',
+  'Panificație',
+  'Vinificație',
+  'Legume & Fructe',
+  'Tradițional',
+  'Apicultură',
+];
 
 export default function ProducersScreen() {
   const [producers, setProducers] = useState<Producer[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Toate');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,10 +51,13 @@ export default function ProducersScreen() {
 
     setError(null);
     try {
-      const data = await producerService.getAll();
-      setProducers(data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Nu s-au putut încărca producătorii.');
+      setProducers(await apiRequest<Producer[]>('/producers'));
+    } catch (requestError: unknown) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Nu s-au putut încărca producătorii.',
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -43,26 +68,26 @@ export default function ProducersScreen() {
     void loadProducers();
   }, []);
 
-  const categories = [
-    'Toate',
-    ...Array.from(
-      new Set(
-        producers
-          .map((producer) => producer.category?.trim())
-          .filter((category): category is string => Boolean(category)),
-      ),
-    ).filter((category) => category.toLowerCase() !== 'toate'),
-  ];
+  const normalizedSearch = normalizeText(searchQuery);
+  const filteredProducers = producers.filter((producer) => {
+    const category = normalizeText(producer.category ?? '');
+    const matchesCategory =
+      selectedCategory === 'Toate' ||
+      (selectedCategory === 'Legume & Fructe'
+        ? category.includes('legume') ||
+          category.includes('legumicultura') ||
+          category.includes('fructe')
+        : category.includes(normalizeText(selectedCategory)));
+    const matchesSearch =
+      !normalizedSearch ||
+      [producer.name, producer.location, producer.category ?? ''].some((value) =>
+        normalizeText(value).includes(normalizedSearch),
+      );
 
-  const filteredProducers =
-    selectedCategory === 'Toate' || selectedCategory === 'ALL'
-      ? producers
-      : producers.filter(
-          (producer) =>
-            producer.category?.trim().toLowerCase() === selectedCategory.trim().toLowerCase(),
-        );
+    return matchesCategory && matchesSearch;
+  });
 
-  const contactProducer = async (phone: string) => {
+  const callProducer = async (phone: string) => {
     try {
       await Linking.openURL(`tel:${phone}`);
     } catch {
@@ -73,7 +98,7 @@ export default function ProducersScreen() {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#C82333" />
+        <ActivityIndicator size="large" color="#059669" />
         <Text style={styles.statusText}>Se încarcă producătorii locali...</Text>
       </View>
     );
@@ -82,8 +107,8 @@ export default function ProducersScreen() {
   if (error && producers.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
-        <Text style={styles.errorTitle}>Conexiune eșuată la server</Text>
+        <Ionicons name="cloud-offline-outline" size={46} color="#B91C1C" />
+        <Text style={styles.errorTitle}>Nu s-au putut încărca producătorii</Text>
         <Text style={styles.statusText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => void loadProducers()}>
           <Text style={styles.retryButtonText}>Reîncearcă</Text>
@@ -94,35 +119,59 @@ export default function ProducersScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={styles.screen}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={() => void loadProducers(true)}
-          tintColor="#C82333"
+          tintColor="#059669"
         />
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Catalog Producători</Text>
-        <Text style={styles.subtitle}>Descoperă producători locali din județul Arad.</Text>
+        <Text style={styles.eyebrow}>HACK 4 ARAD</Text>
+        <Text style={styles.title}>Producători locali</Text>
+        <Text style={styles.subtitle}>Descoperă afacerile și gusturile județului Arad.</Text>
       </View>
 
       {error && (
-        <View style={styles.refreshError}>
-          <Text style={styles.refreshErrorText}>Actualizarea a eșuat: {error}</Text>
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>Actualizarea a eșuat: {error}</Text>
           <TouchableOpacity onPress={() => void loadProducers(true)}>
-            <Text style={styles.refreshRetryText}>Reîncearcă</Text>
+            <Text style={styles.retryText}>Reîncearcă</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      <View style={styles.searchBox}>
+        <Ionicons name="search-outline" size={19} color="#64748B" />
+        <TextInput
+          accessibilityLabel="Caută producători"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Caută producător sau localitate"
+          placeholderTextColor="#94A3B8"
+          returnKeyType="search"
+          style={styles.searchInput}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Șterge căutarea"
+            onPress={() => setSearchQuery('')}
+          >
+            <Ionicons name="close-circle" size={19} color="#94A3B8" />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        contentContainerStyle={styles.filterContent}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}
       >
         {categories.map((category) => {
           const isActive = selectedCategory === category;
@@ -131,73 +180,99 @@ export default function ProducersScreen() {
               key={category}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
-              style={[styles.filterChip, isActive && styles.activeChip]}
+              style={[styles.filterChip, isActive && styles.activeFilterChip]}
               onPress={() => setSelectedCategory(category)}
             >
-              <Text style={[styles.chipText, isActive && styles.activeChipText]}>{category}</Text>
+              <Text style={[styles.filterText, isActive && styles.activeFilterText]}>
+                {category}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      <View style={styles.producersList}>
-        <Text style={styles.countText}>
-          {filteredProducers.length}{' '}
-          {filteredProducers.length === 1 ? 'producător găsit' : 'producători găsiți'}
+      <View style={styles.listHeader}>
+        <Text style={styles.resultsCount}>
+          {filteredProducers.length} {filteredProducers.length === 1 ? 'producător' : 'producători'}
         </Text>
+      </View>
 
-        {filteredProducers.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="storefront-outline" size={44} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>Nu există producători</Text>
-            <Text style={styles.emptySubtitle}>
-              {producers.length === 0
-                ? 'Nu sunt producători disponibili momentan.'
-                : 'Nu am găsit producători în categoria selectată.'}
-            </Text>
+      {filteredProducers.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="storefront-outline" size={25} color="#059669" />
           </View>
-        ) : (
-          filteredProducers.map((producer) => (
-            <View key={producer.id} style={styles.producerCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.titleWrap}>
-                  <Text style={styles.producerName}>{producer.name}</Text>
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryText}>
-                      {producer.category?.trim() || 'Producător Local'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.ratingBadge}>
-                  <Ionicons name="star" size={14} color="#F59E0B" />
-                  <Text style={styles.ratingText}>{producer.averageRating.toFixed(1)}</Text>
-                </View>
+          <Text style={styles.emptyTitle}>Niciun producător găsit în această categorie</Text>
+          <Text style={styles.emptyText}>Încearcă altă categorie sau modifică termenul căutat.</Text>
+        </View>
+      ) : (
+        filteredProducers.map((producer) => (
+          <View key={producer.id} style={styles.producerCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.producerName}>{producer.name}</Text>
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>
+                  {producer.category?.trim() || 'Producător Local'}
+                </Text>
               </View>
+            </View>
 
-              <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={16} color="#64748B" />
-                <Text style={styles.locationText}>{producer.location}</Text>
-              </View>
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={17} color="#64748B" />
+              <Text style={styles.locationText}>{producer.location}</Text>
+            </View>
 
+            <View style={styles.actionRow}>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel={`Sună ${producer.name}`}
-                style={styles.contactButton}
-                onPress={() => void contactProducer(producer.phone)}
+                accessibilityLabel={`Apelează ${producer.name}`}
+                style={[styles.actionButton, styles.callButton]}
+                onPress={() => void callProducer(producer.phone)}
               >
                 <Ionicons name="call-outline" size={17} color="#FFFFFF" />
-                <Text style={styles.contactButtonText}>Contactează</Text>
+                <Text style={styles.callButtonText}>Apelează</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={`Vezi ${producer.name} pe hartă`}
+                style={[styles.actionButton, styles.mapButton]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/map',
+                    params: {
+                      focusId: producer.id,
+                      lat:
+                        producer.latitude ||
+                        (producer.location?.includes('Miniș') ? 46.1481 : 46.1866),
+                      lng:
+                        producer.longitude ||
+                        (producer.location?.includes('Miniș') ? 21.6142 : 21.3123),
+                      title: producer.name,
+                    },
+                  })
+                }
+              >
+                <Ionicons name="map-outline" size={17} color="#047857" />
+                <Text style={styles.mapButtonText}>Vezi pe Hartă</Text>
               </TouchableOpacity>
             </View>
-          ))
-        )}
-      </View>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
@@ -213,187 +288,227 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+  eyebrow: {
+    color: '#059669',
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 5,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
     color: '#0F172A',
+    fontSize: 23,
+    fontWeight: '800',
   },
   subtitle: {
-    fontSize: 13,
     color: '#64748B',
+    fontSize: 13,
     marginTop: 4,
   },
-  statusText: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  refreshError: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 10,
-    padding: 12,
+  searchBox: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
   },
-  refreshErrorText: {
-    color: '#B91C1C',
-    fontSize: 13,
-  },
-  refreshRetryText: {
-    color: '#C82333',
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 12,
     color: '#0F172A',
-    marginTop: 12,
+    fontSize: 14,
   },
-  retryButton: {
-    backgroundColor: '#C82333',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  filterRow: {
+  filterScroll: {
     flexGrow: 0,
     marginHorizontal: -16,
   },
-  filterContent: {
+  filterRow: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
+    paddingBottom: 3,
   },
   filterChip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
+    marginRight: 8,
     borderRadius: 20,
     backgroundColor: '#E2E8F0',
-    marginRight: 8,
   },
-  activeChip: {
-    backgroundColor: '#C82333',
+  activeFilterChip: {
+    backgroundColor: '#059669',
   },
-  chipText: {
+  filterText: {
+    color: '#334155',
     fontSize: 13,
     fontWeight: '600',
-    color: '#334155',
   },
-  activeChipText: {
+  activeFilterText: {
     color: '#FFFFFF',
   },
-  producersList: {
-    marginTop: 20,
+  listHeader: {
+    marginTop: 18,
+    marginBottom: 10,
   },
-  countText: {
-    fontSize: 14,
-    fontWeight: '600',
+  resultsCount: {
     color: '#64748B',
-    marginBottom: 12,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginTop: 4,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 12,
-  },
-  emptySubtitle: {
     fontSize: 13,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 4,
+    fontWeight: '600',
   },
   producerCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
+    marginBottom: 13,
+    borderWidth: 1,
+    borderColor: '#E8EDF2',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowRadius: 7,
     elevation: 2,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
     alignItems: 'flex-start',
   },
-  titleWrap: {
-    flex: 1,
-    marginRight: 8,
-  },
   producerName: {
-    fontSize: 16,
-    fontWeight: '800',
     color: '#0F172A',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
   },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
     marginTop: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: '#D1FAE5',
   },
   categoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#C82333',
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  ratingText: {
+    color: '#047857',
     fontSize: 12,
     fontWeight: '700',
-    color: '#B45309',
   },
   locationRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 4,
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 13,
   },
   locationText: {
     flex: 1,
-    fontSize: 13,
     color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
   },
-  contactButton: {
+  actionRow: {
+    flexDirection: 'row',
+    gap: 9,
+    marginTop: 15,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 43,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#C82333',
-    paddingVertical: 11,
+    gap: 7,
+    paddingHorizontal: 8,
     borderRadius: 10,
-    marginTop: 14,
   },
-  contactButtonText: {
+  callButton: {
+    backgroundColor: '#059669',
+  },
+  callButtonText: {
     color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mapButton: {
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    backgroundColor: '#ECFDF5',
+  },
+  mapButtonText: {
+    color: '#047857',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 28,
+    marginTop: 5,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: '#ECFDF5',
+  },
+  emptyTitle: {
+    marginTop: 12,
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyText: {
+    marginTop: 5,
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  statusText: {
+    marginTop: 12,
+    color: '#64748B',
     fontSize: 14,
+    textAlign: 'center',
+  },
+  errorTitle: {
+    marginTop: 12,
+    color: '#0F172A',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 9,
+    backgroundColor: '#059669',
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  errorBanner: {
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEF2F2',
+  },
+  errorBannerText: {
+    color: '#B91C1C',
+    fontSize: 13,
+  },
+  retryText: {
+    marginTop: 7,
+    color: '#B91C1C',
+    fontSize: 13,
     fontWeight: '700',
   },
 });
