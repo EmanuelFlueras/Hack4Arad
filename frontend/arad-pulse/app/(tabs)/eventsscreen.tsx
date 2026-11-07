@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { eventService, BackendEvent } from '../../services/eventService';
 
 // Configurare limbă română pentru calendar
@@ -28,6 +28,21 @@ LocaleConfig.defaultLocale = 'ro';
 
 type FilterType = 'ALL' | 'THIS_WEEK' | 'THIS_MONTH' | 'TBA';
 
+function formatEventDate(dateValue: string | Date | undefined): string {
+  if (!dateValue) return 'Dată nespecificată';
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return 'TBA';
+
+  return date.toLocaleDateString('ro-RO', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function EventsScreen() {
   const [events, setEvents] = useState<BackendEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +53,7 @@ export default function EventsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showCalendar, setShowCalendar] = useState(true);
 
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       setError(null);
       const data = await eventService.getAll();
@@ -49,11 +64,13 @@ export default function EventsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    loadEvents();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadEvents();
+    }, [loadEvents]),
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -284,13 +301,7 @@ export default function EventsScreen() {
                     <View style={styles.dateBadge}>
                       <Ionicons name="time-outline" size={14} color="#C82333" />
                       <Text style={styles.dateText}>
-                        {item.isTba || !item.startDate
-                          ? 'Dată în curs de stabilire (TBA)'
-                          : new Date(item.startDate).toLocaleDateString('ro-RO', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric',
-                            })}
+                        {formatEventDate(item.date ?? undefined)}
                       </Text>
                     </View>
                   </View>

@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -13,6 +16,8 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import authService, { type UserSession } from '../../services/authService';
+import { apiRequest } from '../../services/api';
+import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const lightPalette = {
   background: '#F8FAFC',
@@ -45,6 +50,14 @@ export default function SettingsScreen() {
   const [editError, setEditError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 86400000));
+  const [eventLocation, setEventLocation] = useState('');
+  const [eventCategory, setEventCategory] = useState('Târg');
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
   const palette = isDarkMode ? darkPalette : lightPalette;
 
@@ -107,6 +120,56 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleCreateEvent = async () => {
+    setEventError(null);
+    if (!currentUser) return;
+    if (!eventTitle.trim() || !eventLocation.trim()) {
+      setEventError('Titlul, data și locația sunt obligatorii.');
+      return;
+    }
+
+    if (Number.isNaN(selectedDate.getTime())) {
+      setEventError('Selectează o dată și o oră valide.');
+      return;
+    }
+
+    const token = await authService.getToken();
+    if (!token) {
+      Alert.alert('Autentificare necesară', 'Te rugăm să te autentifici din nou pentru a publica evenimentul.');
+      return;
+    }
+
+    setIsSubmittingEvent(true);
+    try {
+      await apiRequest('/events', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: eventTitle.trim(),
+          description: eventDescription.trim(),
+          date: selectedDate.toISOString(),
+          location: eventLocation.trim(),
+          category: eventCategory,
+          creatorId: currentUser.id,
+        }),
+      });
+      setShowEventModal(false);
+      setEventTitle('');
+      setEventDescription('');
+      setSelectedDate(new Date(Date.now() + 86400000));
+      setEventLocation('');
+      setEventCategory('Târg');
+      Alert.alert('Publicare reușită', 'Evenimentul a fost publicat cu succes!');
+      router.push('/eventsscreen');
+    } catch (requestError: unknown) {
+      setEventError(
+        requestError instanceof Error ? requestError.message : 'Nu s-a putut publica evenimentul.',
+      );
+    } finally {
+      setIsSubmittingEvent(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingScreen, { backgroundColor: palette.background }]}>
@@ -153,6 +216,10 @@ export default function SettingsScreen() {
             palette={palette}
             isDarkMode={isDarkMode}
             onEditPress={openEditModal}
+            onAddEvent={() => {
+              setEventError(null);
+              setShowEventModal(true);
+            }}
             onLogout={() => void handleLogout()}
             onThemeChange={setIsDarkMode}
           />
@@ -178,6 +245,24 @@ export default function SettingsScreen() {
         onChangeCategory={setEditCategory}
         onClose={() => setIsEditModalVisible(false)}
         onSave={saveProfileDraft}
+      />
+      <EventCreateModal
+        visible={showEventModal}
+        palette={palette}
+        title={eventTitle}
+        description={eventDescription}
+        selectedDate={selectedDate}
+        location={eventLocation}
+        category={eventCategory}
+        error={eventError}
+        isSubmitting={isSubmittingEvent}
+        onChangeTitle={setEventTitle}
+        onChangeDescription={setEventDescription}
+        onChangeDate={setSelectedDate}
+        onChangeLocation={setEventLocation}
+        onChangeCategory={setEventCategory}
+        onClose={() => setShowEventModal(false)}
+        onSubmit={() => void handleCreateEvent()}
       />
     </>
   );
@@ -252,6 +337,7 @@ function LoggedInView({
   palette,
   isDarkMode,
   onEditPress,
+  onAddEvent,
   onLogout,
   onThemeChange,
 }: {
@@ -259,6 +345,7 @@ function LoggedInView({
   palette: Palette;
   isDarkMode: boolean;
   onEditPress: () => void;
+  onAddEvent: () => void;
   onLogout: () => void;
   onThemeChange: (value: boolean) => void;
 }) {
@@ -302,6 +389,17 @@ function LoggedInView({
           <Text style={[styles.actionLabel, { color: palette.text }]}>Editare cont</Text>
           <Ionicons name="chevron-forward" size={18} color={palette.muted} />
         </TouchableOpacity>
+        {(user.role === 'PRODUCER' || user.role === 'ADMIN') && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.addEventButton}
+            onPress={onAddEvent}
+          >
+            <Ionicons name="calendar-outline" size={19} color="#FFFFFF" />
+            <Text style={styles.addEventButtonText}>Adaugă Eveniment / Târg</Text>
+            <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <PreferencesCard palette={palette} isDarkMode={isDarkMode} onThemeChange={onThemeChange} />
@@ -447,6 +545,301 @@ function ProfileEditModal({
       </View>
     </Modal>
   );
+}
+
+const eventCategories = ['Târg', 'Degustare', 'Festival', 'Tradițional'] as const;
+
+function EventCreateModal({
+  visible,
+  palette,
+  title,
+  description,
+  selectedDate,
+  location,
+  category,
+  error,
+  isSubmitting,
+  onChangeTitle,
+  onChangeDescription,
+  onChangeDate,
+  onChangeLocation,
+  onChangeCategory,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  palette: Palette;
+  title: string;
+  description: string;
+  selectedDate: Date;
+  location: string;
+  category: string;
+  error: string | null;
+  isSubmitting: boolean;
+  onChangeTitle: (value: string) => void;
+  onChangeDescription: (value: string) => void;
+  onChangeDate: (value: Date) => void;
+  onChangeLocation: (value: string) => void;
+  onChangeCategory: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+  const DateTimePicker =
+    Platform.OS === 'web'
+      ? null
+      : (require('@react-native-community/datetimepicker') as typeof import('@react-native-community/datetimepicker')).default;
+
+  useEffect(() => {
+    if (!visible) {
+      setShowDatePicker(false);
+      setPickerMode('date');
+    }
+  }, [visible]);
+
+  const formattedDate = `${selectedDate.toLocaleDateString('ro-RO')} la ${selectedDate.toLocaleTimeString(
+    'ro-RO',
+    { hour: '2-digit', minute: '2-digit' },
+  )}`;
+
+  const handleNativeDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (event.type === 'dismissed') {
+      setShowDatePicker(false);
+      setPickerMode('date');
+      return;
+    }
+    if (!date) return;
+
+    onChangeDate(date);
+    if (pickerMode === 'date') {
+      setPickerMode('time');
+      if (Platform.OS === 'android') {
+        setShowDatePicker(false);
+        setTimeout(() => setShowDatePicker(true), 0);
+      }
+    } else {
+      setShowDatePicker(false);
+      setPickerMode('date');
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.eventKeyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.eventBackdrop}>
+          <ScrollView
+            contentContainerStyle={styles.eventScrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={[styles.eventModal, { backgroundColor: palette.surface }]}>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalTitleWrap}>
+                  <Text style={[styles.modalTitle, { color: palette.text }]}>Adaugă Eveniment / Târg</Text>
+                  <Text style={[styles.modalSubtitle, { color: palette.muted }]}>Publică un eveniment local</Text>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Închide formularul"
+                  style={[styles.closeButton, { backgroundColor: palette.subtle }]}
+                  onPress={onClose}
+                >
+                  <Ionicons name="close" size={20} color={palette.muted} />
+                </TouchableOpacity>
+              </View>
+
+              <EventFormField
+                label="Titlu"
+                value={title}
+                onChangeText={onChangeTitle}
+                placeholder="Stand Degustare Pâine Pecica"
+                palette={palette}
+              />
+              <EventFormField
+                label="Descriere"
+                value={description}
+                onChangeText={onChangeDescription}
+                placeholder="Vă așteptăm cu pâine proaspătă și produse de panificație."
+                palette={palette}
+                multiline
+              />
+              <View style={styles.eventField}>
+                <Text style={[styles.fieldLabel, { color: palette.text }]}>Data și ora</Text>
+                {Platform.OS === 'web' ? (
+                  <View style={styles.datePickerButton}>
+                    <Ionicons name="calendar-outline" size={18} color="#059669" />
+                    <Text style={styles.datePickerText}>{formattedDate}</Text>
+                    {React.createElement('input', {
+                      type: 'datetime-local',
+                      'aria-label': 'Selectează data și ora',
+                      value: toLocalDateTimeValue(selectedDate),
+                      onChange: (event) => {
+                        const nextDate = new Date(event.currentTarget.value);
+                        if (!Number.isNaN(nextDate.getTime())) onChangeDate(nextDate);
+                      },
+                      style: {
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: 'pointer',
+                      },
+                    })}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.datePickerButton}
+                    onPress={() => {
+                      setPickerMode('date');
+                      setShowDatePicker(true);
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color="#059669" />
+                    <Text style={styles.datePickerText}>{formattedDate}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {Platform.OS !== 'web' && showDatePicker && DateTimePicker && (
+                <View>
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode={pickerMode}
+                    is24Hour
+                    onChange={handleNativeDateChange}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      style={styles.pickerDoneButton}
+                      onPress={() => {
+                        setShowDatePicker(false);
+                        setPickerMode('date');
+                      }}
+                    >
+                      <Text style={styles.pickerDoneText}>Gata</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              <EventFormField
+                label="Locație"
+                value={location}
+                onChangeText={onChangeLocation}
+                placeholder="Piața Avram Iancu, Arad"
+                palette={palette}
+              />
+
+              <Text style={[styles.eventCategoryLabel, { color: palette.text }]}>Categorie</Text>
+              <View style={styles.eventCategoryRow}>
+                {eventCategories.map((eventCategory) => {
+                  const isSelected = category === eventCategory;
+                  return (
+                    <TouchableOpacity
+                      key={eventCategory}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      style={[
+                        styles.eventCategoryChip,
+                        { borderColor: palette.border, backgroundColor: palette.subtle },
+                        isSelected && styles.selectedEventCategoryChip,
+                      ]}
+                      onPress={() => onChangeCategory(eventCategory)}
+                    >
+                      <Text
+                        style={[
+                          styles.eventCategoryText,
+                          { color: palette.muted },
+                          isSelected && styles.selectedEventCategoryText,
+                        ]}
+                      >
+                        {eventCategory}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {error && (
+                <View style={styles.editError}>
+                  <Ionicons name="alert-circle-outline" size={17} color="#B91C1C" />
+                  <Text style={styles.editErrorText}>{error}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={isSubmitting}
+                style={[styles.publishButton, isSubmitting && styles.disabledButton]}
+                onPress={onSubmit}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={19} color="#FFFFFF" />
+                    <Text style={styles.publishButtonText}>Publică Evenimentul</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={isSubmitting}
+                style={styles.cancelEventButton}
+                onPress={onClose}
+              >
+                <Text style={[styles.cancelEventText, { color: palette.muted }]}>Anulează</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function EventFormField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  palette,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  palette: Palette;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.eventField}>
+      <Text style={[styles.fieldLabel, { color: palette.text }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#94A3B8"
+        multiline={multiline}
+        textAlignVertical={multiline ? 'top' : 'center'}
+        style={[
+          styles.eventInput,
+          multiline && styles.eventDescriptionInput,
+          { backgroundColor: palette.input, borderColor: palette.border, color: palette.text },
+        ]}
+      />
+    </View>
+  );
+}
+
+function toLocalDateTimeValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
 }
 
 function EditField({
@@ -820,5 +1213,148 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     fontSize: 12,
     lineHeight: 17,
+  },
+  addEventButton: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    backgroundColor: '#059669',
+  },
+  addEventButtonText: {
+    flexShrink: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  eventKeyboard: {
+    flex: 1,
+  },
+  eventBackdrop: {
+    flex: 1,
+    padding: 14,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+  },
+  eventScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  eventModal: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '100%',
+    alignSelf: 'center',
+    padding: 20,
+    borderRadius: 18,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  eventField: {
+    gap: 6,
+    marginBottom: 13,
+  },
+  eventInput: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    fontSize: 14,
+  },
+  eventDescriptionInput: {
+    minHeight: 92,
+  },
+  datePickerButton: {
+    position: 'relative',
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    backgroundColor: '#ECFDF5',
+  },
+  datePickerText: {
+    flex: 1,
+    color: '#047857',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pickerDoneButton: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  pickerDoneText: {
+    color: '#059669',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  eventCategoryLabel: {
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  eventCategoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginBottom: 15,
+  },
+  eventCategoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderRadius: 18,
+  },
+  selectedEventCategoryChip: {
+    borderColor: '#059669',
+    backgroundColor: '#059669',
+  },
+  eventCategoryText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectedEventCategoryText: {
+    color: '#FFFFFF',
+  },
+  publishButton: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    backgroundColor: '#059669',
+  },
+  publishButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  disabledButton: {
+    opacity: 0.65,
+  },
+  cancelEventButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  cancelEventText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

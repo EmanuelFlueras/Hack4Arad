@@ -32,6 +32,9 @@ model Event {
   image       String?
   location    String
   date        DateTime?
+  latitude    Float?
+  longitude   Float?
+  category    String?
 
   creatorId   String
   creator     User     @relation("CreatedEvents", fields: [creatorId], references: [id], onDelete: Cascade)

@@ -5,6 +5,7 @@ export interface BackendEvent {
   title: string;
   description: string;
   location: string;
+  date?: string | Date | null;
   startDate?: string | null;
   endDate?: string | null;
   isTba?: boolean;

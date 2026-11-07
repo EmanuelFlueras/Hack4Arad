@@ -87,6 +87,14 @@ const authService = {
 		await Promise.all([deleteStoredValue(TOKEN_KEY), deleteStoredValue(USER_KEY)]);
 	},
 
+	async getToken(): Promise<string | null> {
+		try {
+			return await getStoredValue(TOKEN_KEY);
+		} catch {
+			return null;
+		}
+	},
+
 	async getCurrentUser(): Promise<UserSession | null> {
 		try {
 			const userData = await getStoredValue(USER_KEY);
