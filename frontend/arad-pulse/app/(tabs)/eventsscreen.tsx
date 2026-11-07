@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { eventService, BackendEvent } from '../../services/eventService';
 import { useTheme } from '../../context/ThemeContext';
+import WeekendPlannerModal from '../../components/WeekendPlannerModal';
 
 // Configurare limbă română pentru calendar
 LocaleConfig.locales['ro'] = {
@@ -89,6 +90,7 @@ export default function EventsScreen() {
   const [selectedEvent, setSelectedEvent] = useState<BackendEvent | null>(null);
   const [impressionDraft, setImpressionDraft] = useState('');
   const [localImpressions, setLocalImpressions] = useState<Record<string, string[]>>({});
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -268,6 +270,27 @@ export default function EventsScreen() {
         />
       }
     >
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Deschide planificatorul de weekend"
+        activeOpacity={0.9}
+        style={[styles.plannerBanner, { backgroundColor: colors.primary }]}
+        onPress={() => setPlannerOpen(true)}
+      >
+        <View style={styles.plannerBannerHeading}>
+          <Ionicons name="compass-outline" size={26} color="#FFFFFF" />
+          <Text style={styles.plannerBannerTitle}>Planificator de Weekend în Județ</Text>
+        </View>
+        <Text style={styles.plannerBannerSubtitle}>
+          Generează-ți traseul perfect între obiective și producători în 10 secunde.
+        </Text>
+        <View style={styles.plannerBannerButton}>
+          <Text style={[styles.plannerBannerButtonText, { color: colors.primary }]}>
+            Creează Traseu ✨
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.calendarHeader}>
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Calendarul Evenimentelor</Text>
@@ -692,6 +715,10 @@ export default function EventsScreen() {
         </View>
       )}
     </Modal>
+    <WeekendPlannerModal
+      visible={plannerOpen}
+      onClose={() => setPlannerOpen(false)}
+    />
     </>
   );
 }
@@ -704,6 +731,45 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 32,
+  },
+  plannerBanner: {
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  plannerBannerHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  plannerBannerTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  plannerBannerSubtitle: {
+    color: '#FEE2E2',
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  plannerBannerButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  plannerBannerButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   centerContainer: {
     flex: 1,
