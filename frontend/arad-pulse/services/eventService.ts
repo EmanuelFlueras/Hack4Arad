@@ -5,10 +5,16 @@ export interface BackendEvent {
   title: string;
   description: string;
   location: string;
+  image?: string | null;
   date?: string | Date | null;
   startDate?: string | null;
   endDate?: string | null;
   isTba?: boolean;
+  creator?: {
+    id: string;
+    name: string;
+    phone?: string;
+  } | null;
   partners?: Array<{
     id: string;
     name: string;

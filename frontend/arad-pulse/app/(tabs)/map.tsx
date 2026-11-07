@@ -14,6 +14,7 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import type MapViewInstance from 'react-native-maps';
 import type { Region } from 'react-native-maps';
+import { useTheme } from '../../context/ThemeContext';
 import { MapPoint, mapService } from '../../services/mapService';
 
 type PointFilter = 'ALL' | 'EVENT' | 'PRODUCER';
@@ -35,6 +36,7 @@ const filters: { key: PointFilter; label: string }[] = [
 ];
 
 export default function MapScreen() {
+  const { colors } = useTheme();
   const { focusId, lat, lng } = useLocalSearchParams<{
     focusId?: string;
     lat?: string;
@@ -136,20 +138,23 @@ export default function MapScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#C82333" />
-        <Text style={styles.statusText}>Se încarcă punctele de pe hartă...</Text>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.statusText, { color: colors.subtext }]}>Se încarcă punctele de pe hartă...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
-        <Text style={styles.errorTitle}>Conexiune eșuată la server</Text>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => void loadPoints()}>
+        <Text style={[styles.errorTitle, { color: colors.text }]}>Conexiune eșuată la server</Text>
+        <Text style={[styles.errorText, { color: colors.subtext }]}>{error}</Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={() => void loadPoints()}
+        >
           <Text style={styles.retryButtonText}>Reîncearcă</Text>
         </TouchableOpacity>
       </View>
@@ -205,20 +210,21 @@ function WebPointsList({
   onNavigate,
   onClosePreview,
 }: MapViewProps & { allPoints: MapPoint[] }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.webScreen}>
+    <View style={[styles.webScreen, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.webScroll}
         contentContainerStyle={[styles.webContent, selectedPoint && styles.webContentWithPreview]}
       >
         <View style={styles.pageHeader}>
-          <Text style={styles.title}>Harta Producătorilor</Text>
-          <Text style={styles.subtitle}>Evenimente și producători locali din județul Arad.</Text>
+          <Text style={[styles.title, { color: colors.primary }]}>Harta Producătorilor</Text>
+          <Text style={[styles.subtitle, { color: colors.subtext }]}>Evenimente și producători locali din județul Arad.</Text>
         </View>
 
         <FilterBar filter={filter} onFilterChange={onFilterChange} />
 
-        <Text style={styles.pointsCount}>
+        <Text style={[styles.pointsCount, { color: colors.subtext }]}>
           {points.length} {points.length === 1 ? 'punct afișat' : 'puncte afișate'}
         </Text>
 
@@ -260,6 +266,7 @@ function NativePointsMap({
   onNavigate,
   onClosePreview,
 }: MapViewProps & { focusRegion: Region | null }) {
+  const { colors, isDark } = useTheme();
   const { default: MapViewComponent, Marker } = require('react-native-maps') as typeof import('react-native-maps');
   const mapRef = useRef<MapViewInstance | null>(null);
 
@@ -270,10 +277,11 @@ function NativePointsMap({
   }, [focusRegion]);
 
   return (
-    <View style={styles.nativeScreen}>
+    <View style={[styles.nativeScreen, { backgroundColor: colors.background }]}>
       <MapViewComponent
         ref={mapRef}
         style={styles.map}
+        userInterfaceStyle={isDark ? 'dark' : 'light'}
         initialRegion={focusRegion ?? INITIAL_REGION}
       >
         {points.map((point) => {
@@ -308,7 +316,18 @@ function NativePointsMap({
       </MapViewComponent>
 
       <View style={styles.nativeTopOverlay} pointerEvents="box-none">
-        <Text style={styles.nativeTitle}>Harta Producătorilor</Text>
+        <Text
+          style={[
+            styles.nativeTitle,
+            {
+              color: colors.primary,
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          Harta Producătorilor
+        </Text>
         <FilterBar filter={filter} onFilterChange={onFilterChange} />
       </View>
 
@@ -338,8 +357,9 @@ function FilterBar({
   filter: PointFilter;
   onFilterChange: (filter: PointFilter) => void;
 }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.filterBar}>
+    <View style={[styles.filterBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {filters.map((item) => {
         const isActive = filter === item.key;
         return (
@@ -347,10 +367,18 @@ function FilterBar({
             key={item.key}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
-            style={[styles.filterChip, isActive && styles.activeChip]}
+            style={[
+              styles.filterChip,
+              {
+                backgroundColor: isActive ? colors.primary : colors.card,
+                borderColor: isActive ? colors.primary : colors.border,
+              },
+            ]}
             onPress={() => onFilterChange(item.key)}
           >
-            <Text style={[styles.chipText, isActive && styles.activeChipText]}>{item.label}</Text>
+            <Text style={[styles.chipText, { color: isActive ? '#FFFFFF' : colors.subtext }]}>
+              {item.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -367,29 +395,33 @@ function PointCard({
   selected: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`Ver ${point.title} pe hartă`}
       onPress={onPress}
       activeOpacity={0.85}
-      style={[styles.pointCard, selected && styles.selectedPointCard]}
+      style={[
+        styles.pointCard,
+        { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border },
+      ]}
     >
       <View style={styles.pointCardHeader}>
-        <Text style={styles.pointTitle}>{point.title}</Text>
+        <Text style={[styles.pointTitle, { color: colors.text }]}>{point.title}</Text>
         <PointTypeBadge type={point.type} />
       </View>
       <View style={styles.pointTags}>
-        <View style={styles.categoryTag}>
-          <Text style={styles.categoryTagText}>{getCategoryLabel(point)}</Text>
+        <View style={[styles.categoryTag, { backgroundColor: colors.inputBg }]}>
+          <Text style={[styles.categoryTagText, { color: colors.subtext }]}>{getCategoryLabel(point)}</Text>
         </View>
-        <View style={styles.locationTag}>
-          <Ionicons name="location-outline" size={13} color="#64748B" />
-          <Text style={styles.locationTagText}>{point.address || 'Locație nespecificată'}</Text>
+        <View style={[styles.locationTag, { backgroundColor: colors.background }]}>
+          <Ionicons name="location-outline" size={13} color={colors.subtext} />
+          <Text style={[styles.locationTagText, { color: colors.subtext }]}>{point.address || 'Locație nespecificată'}</Text>
         </View>
       </View>
       {point.description ? (
-        <Text numberOfLines={2} style={styles.pointDescription}>
+        <Text numberOfLines={2} style={[styles.pointDescription, { color: colors.subtext }]}>
           {point.description}
         </Text>
       ) : null}
@@ -410,6 +442,7 @@ function PointPreview({
   onNavigate: () => void;
   style: object;
 }) {
+  const { colors } = useTheme();
   const distance = calculateDistance(
     userLocation?.latitude ?? ARAD_CENTER.latitude,
     userLocation?.longitude ?? ARAD_CENTER.longitude,
@@ -418,51 +451,51 @@ function PointPreview({
   );
 
   return (
-    <View style={[styles.previewCard, style]}>
+    <View style={[styles.previewCard, style, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.previewHeader}>
         <View style={styles.previewTitleWrap}>
           <PointTypeBadge type={point.type} />
-          <Text numberOfLines={2} style={styles.previewTitle}>
+          <Text numberOfLines={2} style={[styles.previewTitle, { color: colors.text }]}>
             {point.title}
           </Text>
         </View>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Închide detaliile punctului"
-          style={styles.closeButton}
+          style={[styles.closeButton, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
           onPress={onClose}
         >
-          <Ionicons name="close" size={20} color="#475569" />
+          <Ionicons name="close" size={20} color={colors.subtext} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.distancePill}>
-        <Ionicons name="navigate-circle-outline" size={17} color="#0284C7" />
-        <Text style={styles.distanceText}>
+        <Ionicons name="navigate-circle-outline" size={17} color={colors.primary} />
+        <Text style={[styles.distanceText, { color: colors.primary }]}>
           {distance} {userLocation ? 'de tine' : 'de centrul Aradului'}
         </Text>
       </View>
       {!userLocation && (
-        <Text style={styles.distanceNote}>Distanță estimată față de centrul Aradului.</Text>
+        <Text style={[styles.distanceNote, { color: colors.subtext }]}>Distanță estimată față de centrul Aradului.</Text>
       )}
 
-      <View style={styles.previewCategory}>
-        <Text style={styles.categoryTagText}>{getCategoryLabel(point)}</Text>
+      <View style={[styles.previewCategory, { backgroundColor: colors.inputBg }]}>
+        <Text style={[styles.categoryTagText, { color: colors.subtext }]}>{getCategoryLabel(point)}</Text>
       </View>
       <View style={styles.previewLocation}>
-        <Ionicons name="location-outline" size={15} color="#64748B" />
-        <Text style={styles.previewLocationText}>
+        <Ionicons name="location-outline" size={15} color={colors.subtext} />
+        <Text style={[styles.previewLocationText, { color: colors.subtext }]}>
           {point.address || 'Locație nespecificată'}
         </Text>
       </View>
-      <Text style={styles.previewDescription}>
+      <Text style={[styles.previewDescription, { color: colors.subtext }]}>
         {point.description || 'Nu există o descriere disponibilă.'}
       </Text>
       <TouchableOpacity
         accessibilityRole="button"
         style={[
           styles.navigateButton,
-          point.type === 'PRODUCER' ? styles.navigateProducerButton : styles.navigateEventButton,
+          { backgroundColor: colors.primary },
         ]}
         onPress={onNavigate}
       >
@@ -488,9 +521,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 function PointTypeBadge({ type }: { type: MapPoint['type'] }) {
+  const { colors } = useTheme();
   const isProducer = type === 'PRODUCER';
   return (
-    <View style={[styles.typeBadge, isProducer ? styles.producerBadge : styles.eventBadge]}>
+    <View style={[styles.typeBadge, { backgroundColor: colors.primary }]}>
       <Text
         style={[styles.typeBadgeText, isProducer ? styles.producerBadgeText : styles.eventBadgeText]}
       >
@@ -501,11 +535,12 @@ function PointTypeBadge({ type }: { type: MapPoint['type'] }) {
 }
 
 function EmptyPoints({ isEmpty }: { isEmpty: boolean }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.emptyCard}>
+    <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Ionicons name="map-outline" size={38} color="#94A3B8" />
-      <Text style={styles.emptyTitle}>{isEmpty ? 'Harta este goală' : 'Niciun rezultat'}</Text>
-      <Text style={styles.emptyText}>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{isEmpty ? 'Harta este goală' : 'Niciun rezultat'}</Text>
+      <Text style={[styles.emptyText, { color: colors.subtext }]}>
         {isEmpty
           ? 'Nu sunt puncte disponibile momentan.'
           : 'Nu există puncte pentru filtrul selectat.'}
@@ -543,7 +578,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#DC2626',
   },
   subtitle: {
     fontSize: 13,
@@ -577,7 +612,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -592,6 +627,8 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 5,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -606,7 +643,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   activeChip: {
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
   },
   chipText: {
     color: '#475569',
@@ -629,7 +666,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -637,7 +674,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   selectedPointCard: {
-    borderColor: '#C82333',
+    borderColor: '#DC2626',
   },
   pointCardHeader: {
     flexDirection: 'row',
@@ -657,10 +694,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   producerBadge: {
-    backgroundColor: '#059669',
+    backgroundColor: '#DC2626',
   },
   eventBadge: {
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
   },
   typeBadgeText: {
     fontSize: 11,
@@ -721,10 +758,12 @@ const styles = StyleSheet.create({
   nativeTitle: {
     paddingHorizontal: 13,
     paddingVertical: 9,
-    color: '#0F172A',
+    color: '#DC2626',
     fontSize: 16,
     fontWeight: '800',
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -750,10 +789,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   producerMarker: {
-    backgroundColor: '#059669',
+    backgroundColor: '#DC2626',
   },
   eventMarker: {
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
   },
   selectedMarker: {
     transform: [{ scale: 1.15 }],
@@ -769,6 +808,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -790,6 +831,8 @@ const styles = StyleSheet.create({
   },
   previewCard: {
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 16,
     shadowColor: '#000',
@@ -868,10 +911,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#FEF2F2',
   },
   distanceText: {
-    color: '#0369A1',
+    color: '#B91C1C',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -890,10 +933,10 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   navigateProducerButton: {
-    backgroundColor: '#059669',
+    backgroundColor: '#DC2626',
   },
   navigateEventButton: {
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
   },
   navigateButtonText: {
     color: '#FFFFFF',

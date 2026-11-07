@@ -17,6 +17,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTheme, type ThemeColors } from '../../context/ThemeContext';
 import authService, { type UserSession } from '../../services/authService';
 import { apiRequest } from '../../services/api';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -48,30 +49,10 @@ const eventImagePresets = [
   },
 ];
 
-const lightPalette = {
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  text: '#0F172A',
-  muted: '#64748B',
-  border: '#E2E8F0',
-  subtle: '#F1F5F9',
-  input: '#FFFFFF',
-};
-
-const darkPalette = {
-  background: '#0F172A',
-  surface: '#1E293B',
-  text: '#F8FAFC',
-  muted: '#CBD5E1',
-  border: '#334155',
-  subtle: '#334155',
-  input: '#0F172A',
-};
-
 export default function SettingsScreen() {
+  const { isDark, toggleTheme, colors } = useTheme();
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editPhone, setEditPhone] = useState('');
   const [editLocation, setEditLocation] = useState('');
@@ -89,7 +70,15 @@ export default function SettingsScreen() {
   const [eventError, setEventError] = useState<string | null>(null);
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
-  const palette = isDarkMode ? darkPalette : lightPalette;
+  const palette = {
+    background: colors.background,
+    surface: colors.card,
+    text: colors.text,
+    muted: colors.subtext,
+    border: colors.border,
+    subtle: colors.inputBg,
+    input: colors.card,
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -211,7 +200,7 @@ export default function SettingsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingScreen, { backgroundColor: palette.background }]}>
-        <ActivityIndicator size="large" color="#C82333" />
+        <ActivityIndicator size="large" color="#DC2626" />
       </View>
     );
   }
@@ -223,20 +212,20 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.pageHeader}>
-          <Text style={[styles.pageTitle, { color: palette.text }]}>Setări & Cont</Text>
+          <Text style={[styles.pageTitle, { color: '#DC2626' }]}>Setări & Cont</Text>
           <Text style={[styles.pageSubtitle, { color: palette.muted }]}>HACK 4 ARAD</Text>
         </View>
 
         {feedback && (
           <View style={styles.feedbackBanner}>
-            <Ionicons name="checkmark-circle-outline" size={18} color="#047857" />
+            <Ionicons name="checkmark-circle-outline" size={18} color="#DC2626" />
             <Text style={styles.feedbackText}>{feedback}</Text>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Închide notificarea"
               onPress={() => setFeedback(null)}
             >
-              <Ionicons name="close" size={17} color="#047857" />
+              <Ionicons name="close" size={17} color="#DC2626" />
             </TouchableOpacity>
           </View>
         )}
@@ -252,7 +241,8 @@ export default function SettingsScreen() {
           <LoggedInView
             user={currentUser}
             palette={palette}
-            isDarkMode={isDarkMode}
+            colors={colors}
+            isDark={isDark}
             onEditPress={openEditModal}
             onAddEvent={() => {
               void triggerHaptic(() =>
@@ -262,14 +252,15 @@ export default function SettingsScreen() {
               setShowEventModal(true);
             }}
             onLogout={() => void handleLogout()}
-            onThemeChange={setIsDarkMode}
+            toggleTheme={toggleTheme}
           />
         ) : (
           <GuestView
             palette={palette}
-            isDarkMode={isDarkMode}
+            colors={colors}
+            isDark={isDark}
             onEnroll={() => router.push('/modal')}
-            onThemeChange={setIsDarkMode}
+            toggleTheme={toggleTheme}
           />
         )}
       </ScrollView>
@@ -323,31 +314,23 @@ interface Palette {
 
 function GuestView({
   palette,
-  isDarkMode,
+  colors,
+  isDark,
   onEnroll,
-  onThemeChange,
+  toggleTheme,
 }: {
   palette: Palette;
-  isDarkMode: boolean;
+  colors: ThemeColors;
+  isDark: boolean;
   onEnroll: () => void;
-  onThemeChange: (value: boolean) => void;
+  toggleTheme: () => void;
 }) {
   return (
     <>
-      <View style={styles.welcomeCard}>
-        <View style={styles.welcomeIcon}>
-          <Ionicons name="leaf-outline" size={22} color="#FFFFFF" />
-        </View>
-        <Text style={styles.welcomeTitle}>Bine ai venit în HACK 4 ARAD!</Text>
-        <Text style={styles.welcomeText}>
-          Descoperă comunitatea locală sau solicită un cont pentru a-ți prezenta afacerea.
-        </Text>
-      </View>
-
-      <View style={[styles.card, { backgroundColor: palette.surface }]}>
+      <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <View style={styles.cardHeadingRow}>
-          <View style={[styles.iconTile, { backgroundColor: isDarkMode ? '#3B2530' : '#FEE2E2' }]}>
-            <Ionicons name="people-outline" size={20} color="#C82333" />
+          <View style={[styles.iconTile, { backgroundColor: isDark ? '#3B2530' : '#FEE2E2' }]}>
+            <Ionicons name="people-outline" size={20} color="#DC2626" />
           </View>
           <View style={styles.cardHeadingText}>
             <Text style={[styles.cardTitle, { color: palette.text }]}>Ești producător sau reprezentant oficial?</Text>
@@ -365,7 +348,7 @@ function GuestView({
         </TouchableOpacity>
       </View>
 
-      <PreferencesCard palette={palette} isDarkMode={isDarkMode} onThemeChange={onThemeChange} />
+      <PreferencesCard isDark={isDark} toggleTheme={toggleTheme} colors={colors} />
 
       <View style={styles.appInfo}>
         <Text style={[styles.appInfoTitle, { color: palette.muted }]}>Arad Pulse</Text>
@@ -378,29 +361,31 @@ function GuestView({
 function LoggedInView({
   user,
   palette,
-  isDarkMode,
+  colors,
+  isDark,
   onEditPress,
   onAddEvent,
   onLogout,
-  onThemeChange,
+  toggleTheme,
 }: {
   user: UserSession;
   palette: Palette;
-  isDarkMode: boolean;
+  colors: ThemeColors;
+  isDark: boolean;
   onEditPress: () => void;
   onAddEvent: () => void;
   onLogout: () => void;
-  onThemeChange: (value: boolean) => void;
+  toggleTheme: () => void;
 }) {
-  const roleColor = user.role === 'PRODUCER' ? '#059669' : user.role === 'ADMIN' ? '#C82333' : '#D97706';
+  const roleColor = user.role === 'PRODUCER' || user.role === 'ADMIN' ? '#DC2626' : '#D97706';
   const roleLabel = user.role === 'PRODUCER' ? 'Producător' : user.role === 'ADMIN' ? 'Administrator' : user.role;
 
   return (
     <>
-      <View style={[styles.profileCard, { backgroundColor: palette.surface }]}>
+      <View style={[styles.profileCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <View style={styles.profileTopRow}>
           <View style={styles.avatar}>
-            <Ionicons name="person" size={25} color="#C82333" />
+            <Ionicons name="person" size={25} color="#DC2626" />
           </View>
           <View style={styles.profileBadges}>
             <View style={[styles.roleBadge, { backgroundColor: roleColor }]}>
@@ -419,15 +404,15 @@ function LoggedInView({
         <ProfileInfoRow icon="location-outline" value={user.location} color={palette.muted} />
       </View>
 
-      <View style={[styles.card, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>Cont</Text>
+      <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+        <Text style={[styles.sectionTitle, { color: '#DC2626' }]}>Cont</Text>
         <TouchableOpacity
           accessibilityRole="button"
           style={[styles.actionRow, { borderColor: palette.border }]}
           onPress={onEditPress}
         >
           <View style={[styles.actionIcon, { backgroundColor: palette.subtle }]}>
-            <Ionicons name="create-outline" size={19} color="#C82333" />
+            <Ionicons name="create-outline" size={19} color="#DC2626" />
           </View>
           <Text style={[styles.actionLabel, { color: palette.text }]}>Editare cont</Text>
           <Ionicons name="chevron-forward" size={18} color={palette.muted} />
@@ -445,14 +430,14 @@ function LoggedInView({
         )}
       </View>
 
-      <PreferencesCard palette={palette} isDarkMode={isDarkMode} onThemeChange={onThemeChange} />
+      <PreferencesCard isDark={isDark} toggleTheme={toggleTheme} colors={colors} />
 
       <TouchableOpacity
         accessibilityRole="button"
         style={styles.logoutButton}
         onPress={onLogout}
       >
-        <Ionicons name="log-out-outline" size={19} color="#C82333" />
+        <Ionicons name="log-out-outline" size={19} color="#DC2626" />
         <Text style={styles.logoutText}>Deconectare</Text>
       </TouchableOpacity>
     </>
@@ -477,31 +462,29 @@ function ProfileInfoRow({
 }
 
 function PreferencesCard({
-  palette,
-  isDarkMode,
-  onThemeChange,
+  isDark,
+  toggleTheme,
+  colors,
 }: {
-  palette: Palette;
-  isDarkMode: boolean;
-  onThemeChange: (value: boolean) => void;
+  isDark: boolean;
+  toggleTheme: () => void;
+  colors: ThemeColors;
 }) {
   return (
-    <View style={[styles.card, { backgroundColor: palette.surface }]}>
-      <Text style={[styles.sectionTitle, { color: palette.text }]}>Preferințe</Text>
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: colors.primary }]}>Preferințe / Aspect</Text>
       <View style={styles.preferenceRow}>
-        <View style={[styles.actionIcon, { backgroundColor: palette.subtle }]}>
-          <Ionicons
-            name={isDarkMode ? 'moon-outline' : 'sunny-outline'}
-            size={19}
-            color={palette.text}
-          />
-        </View>
-        <Text style={[styles.actionLabel, { color: palette.text }]}>Mod Noapte / Zi</Text>
+        <Ionicons
+          name={isDark ? 'moon' : 'sunny-outline'}
+          size={22}
+          color={colors.primary}
+        />
+        <Text style={[styles.actionLabel, { color: colors.text }]}>Mod Noapte</Text>
         <Switch
-          accessibilityLabel="Mod Noapte / Zi"
-          value={isDarkMode}
-          onValueChange={onThemeChange}
-          trackColor={{ false: '#CBD5E1', true: '#C82333' }}
+          accessibilityLabel="Mod Noapte"
+          value={isDark}
+          onValueChange={toggleTheme}
+          trackColor={{ false: '#CBD5E1', true: colors.primary }}
           thumbColor="#FFFFFF"
         />
       </View>
@@ -537,10 +520,10 @@ function ProfileEditModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.editModal, { backgroundColor: palette.surface }]}>
+        <View style={[styles.editModal, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleWrap}>
-              <Text style={[styles.modalTitle, { color: palette.text }]}>Editare cont</Text>
+              <Text style={[styles.modalTitle, { color: '#DC2626' }]}>Editare cont</Text>
               <Text style={[styles.modalSubtitle, { color: palette.muted }]}>Telefon, locație și categorie</Text>
             </View>
             <TouchableOpacity
@@ -685,10 +668,10 @@ function EventCreateModal({
             contentContainerStyle={styles.eventScrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={[styles.eventModal, { backgroundColor: palette.surface }]}>
+            <View style={[styles.eventModal, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleWrap}>
-                  <Text style={[styles.modalTitle, { color: palette.text }]}>Adaugă Eveniment / Târg</Text>
+                  <Text style={[styles.modalTitle, { color: '#DC2626' }]}>Adaugă Eveniment / Târg</Text>
                   <Text style={[styles.modalSubtitle, { color: palette.muted }]}>Publică un eveniment local</Text>
                 </View>
                 <TouchableOpacity
@@ -720,7 +703,7 @@ function EventCreateModal({
                 <Text style={[styles.fieldLabel, { color: palette.text }]}>Data și ora</Text>
                 {Platform.OS === 'web' ? (
                   <View style={styles.datePickerButton}>
-                    <Ionicons name="calendar-outline" size={18} color="#059669" />
+                    <Ionicons name="calendar-outline" size={18} color="#DC2626" />
                     <Text style={styles.datePickerText}>{formattedDate}</Text>
                     {React.createElement('input', {
                       type: 'datetime-local',
@@ -757,7 +740,7 @@ function EventCreateModal({
                       setShowDatePicker(true);
                     }}
                   >
-                    <Ionicons name="calendar-outline" size={18} color="#059669" />
+                    <Ionicons name="calendar-outline" size={18} color="#DC2626" />
                     <Text style={styles.datePickerText}>{formattedDate}</Text>
                   </TouchableOpacity>
                 )}
@@ -1013,6 +996,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
+    color: '#DC2626',
   },
   pageSubtitle: {
     marginTop: 4,
@@ -1020,36 +1004,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
   },
-  welcomeCard: {
-    padding: 20,
-    marginBottom: 14,
-    borderRadius: 16,
-    backgroundColor: '#C82333',
-  },
-  welcomeIcon: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-    borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  welcomeTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  welcomeText: {
-    marginTop: 7,
-    color: '#FEE2E2',
-    fontSize: 14,
-    lineHeight: 20,
-  },
   card: {
     padding: 17,
     marginBottom: 14,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.045,
@@ -1089,7 +1049,7 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingHorizontal: 14,
     borderRadius: 11,
-    backgroundColor: '#C82333',
+    backgroundColor: '#DC2626',
   },
   primaryButtonText: {
     flexShrink: 1,
@@ -1102,6 +1062,7 @@ const styles = StyleSheet.create({
     marginBottom: 11,
     fontSize: 15,
     fontWeight: '800',
+    color: '#DC2626',
   },
   preferenceRow: {
     minHeight: 48,
@@ -1137,6 +1098,8 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.045,
@@ -1217,12 +1180,12 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 3,
     borderWidth: 1,
-    borderColor: '#E8A6AE',
+    borderColor: '#FECACA',
     borderRadius: 12,
     backgroundColor: '#FFF7F7',
   },
   logoutText: {
-    color: '#C82333',
+    color: '#DC2626',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1233,11 +1196,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 14,
     borderRadius: 10,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#F1F5F9',
   },
   feedbackText: {
     flex: 1,
-    color: '#047857',
+    color: '#334155',
     fontSize: 13,
     lineHeight: 18,
   },
@@ -1268,6 +1231,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: 20,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
@@ -1343,7 +1308,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 12,
     borderRadius: 11,
-    backgroundColor: '#059669',
+    backgroundColor: '#DC2626',
   },
   addEventButtonText: {
     flexShrink: 1,
@@ -1372,6 +1337,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: 20,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
@@ -1421,13 +1388,13 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: '#FECACA',
     borderRadius: 10,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#FEF2F2',
   },
   datePickerText: {
     flex: 1,
-    color: '#047857',
+    color: '#B91C1C',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1437,7 +1404,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pickerDoneText: {
-    color: '#059669',
+    color: '#DC2626',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1459,8 +1426,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   selectedEventCategoryChip: {
-    borderColor: '#059669',
-    backgroundColor: '#059669',
+    borderColor: '#DC2626',
+    backgroundColor: '#DC2626',
   },
   eventCategoryText: {
     fontSize: 12,
@@ -1477,7 +1444,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     borderRadius: 11,
-    backgroundColor: '#059669',
+    backgroundColor: '#DC2626',
   },
   publishButtonText: {
     color: '#FFFFFF',

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 
 export default function WelcomeScreen() {
@@ -6,27 +6,41 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.badge}>HACK 4 ARAD</Text>
-      <Text style={styles.title}>Descoperă Aradul și Producătorii Locali</Text>
-      <Text style={styles.subtitle}>
-        Află ce evenimente au loc în weekend și unde găsești standurile producătorilor arădeni.
-      </Text>
+      <View style={styles.brandHeader}>
+        <Image
+          source={require("../assets/images/logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.brandTitle}>Arad Pulse</Text>
+        <Text style={styles.tagline}>
+          Conectăm comunitatea cu producătorii locali
+        </Text>
+      </View>
 
-      {/* Butonul care duce la MainTabs fără cont */}
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={() => router.replace("/eventsscreen")}
-      >
-        <Text style={styles.primaryButtonText}>Intră ca Vizitator</Text>
-      </TouchableOpacity>
+      <View style={styles.actionCard}>
+        <Text style={styles.badge}>HACK 4 ARAD</Text>
+        <Text style={styles.title}>Descoperă Aradul și Producătorii Locali</Text>
+        <Text style={styles.subtitle}>
+          Află ce evenimente au loc în weekend și unde găsești standurile producătorilor arădeni.
+        </Text>
 
-      {/* Buton opțional pentru autentificare */}
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => router.push("/modal")}
-      >
-        <Text style={styles.secondaryButtonText}>Sunt Producător / Organizator</Text>
-      </TouchableOpacity>
+        {/* Butonul care duce la MainTabs fără cont */}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.replace("/eventsscreen")}
+        >
+          <Text style={styles.primaryButtonText}>Intră ca Vizitator</Text>
+        </TouchableOpacity>
+
+        {/* Buton opțional pentru autentificare */}
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => router.push("/modal")}
+        >
+          <Text style={styles.secondaryButtonText}>Sunt Producător / Organizator</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -36,32 +50,71 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
-    backgroundColor: "#ffffff",
+    paddingHorizontal: 20,
+    backgroundColor: "#F8FAFC",
+  },
+  brandHeader: {
+    alignItems: "center",
+    marginBottom: 28,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignSelf: "center",
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#0B132B",
+  },
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
+  },
+  tagline: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  actionCard: {
+    width: "100%",
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   badge: {
     fontSize: 12,
     fontWeight: "bold",
-    color: "#2563eb",
+    color: "#059669",
     letterSpacing: 1.5,
     marginBottom: 12,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "800",
     textAlign: "center",
-    color: "#0f172a",
+    color: "#0F172A",
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 15,
     textAlign: "center",
-    color: "#64748b",
-    marginBottom: 36,
+    color: "#64748B",
+    marginBottom: 24,
     lineHeight: 22,
   },
   primaryButton: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#DC2626",
     width: "100%",
     paddingVertical: 14,
     borderRadius: 12,
@@ -69,7 +122,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryButtonText: {
-    color: "#ffffff",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -79,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E2E8F0",
   },
   secondaryButtonText: {
     color: "#334155",
