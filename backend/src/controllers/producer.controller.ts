@@ -14,7 +14,14 @@ export const getProducers = async (req: Request, res: Response) => {
         receivedReviews: true,
       },
     });
-    res.json(producers);
+
+    res.json(producers.map(({ receivedReviews, ...producer }) => ({
+      ...producer,
+      reviewsReceived: receivedReviews,
+      averageRating: receivedReviews.length
+        ? receivedReviews.reduce((sum, review) => sum + review.rating, 0) / receivedReviews.length
+        : 0,
+    })));
   } catch (error) {
     res.status(500).json({ error: 'Eroare la preluarea producatorilor.' });
   }

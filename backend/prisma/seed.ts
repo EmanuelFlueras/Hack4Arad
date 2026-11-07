@@ -27,46 +27,58 @@ async function main() {
   });
 
   // 2. Producători locali autentici din județul Arad
-  const brutariaPecica = await prisma.user.create({
-    data: {
+  const brutariaPecica = await prisma.user.upsert({
+    where: { phone: '0740111222' },
+    update: { category: 'Panificație' },
+    create: {
       name: 'Pita Tradițională de Pecica',
       phone: '0740111222',
       password: defaultPassword,
       location: 'Strada Principală 45, Pecica, Arad',
       role: 'PRODUCER',
+      category: 'Panificație',
       status: 'APPROVED',
     },
   });
 
-  const cramaMinis = await prisma.user.create({
-    data: {
+  const cramaMinis = await prisma.user.upsert({
+    where: { phone: '0740222333' },
+    update: { category: 'Vinificație' },
+    create: {
       name: 'Cramele Podgoria Miniș-Măderat (Balla Géza)',
       phone: '0740222333',
       password: defaultPassword,
       location: 'Păuliș / Miniș nr. 288, Arad',
       role: 'PRODUCER',
+      category: 'Vinificație',
       status: 'APPROVED',
     },
   });
 
-  const legumeMacea = await prisma.user.create({
-    data: {
+  const legumeMacea = await prisma.user.upsert({
+    where: { phone: '0740333444' },
+    update: { category: 'Legumicultură' },
+    create: {
       name: 'Legume Proaspete de Macea & Curtici',
       phone: '0740333444',
       password: defaultPassword,
       location: 'Comuna Macea, Jud. Arad',
       role: 'PRODUCER',
+      category: 'Legumicultură',
       status: 'APPROVED',
     },
   });
 
-  const apiculturaLipova = await prisma.user.create({
-    data: {
+  const apiculturaLipova = await prisma.user.upsert({
+    where: { phone: '0740444555' },
+    update: { category: 'Apicultură' },
+    create: {
       name: 'Stupina Văii Mureșului - Miere Lipova',
       phone: '0740444555',
       password: defaultPassword,
       location: 'Str. Lugojului 12, Lipova, Arad',
       role: 'PRODUCER',
+      category: 'Apicultură',
       status: 'APPROVED',
     },
   });
