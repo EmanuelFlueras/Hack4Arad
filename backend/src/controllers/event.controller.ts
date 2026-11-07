@@ -58,6 +58,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
     const longitude = parseOptionalCoordinate(body.longitude);
     const description = typeof body.description === 'string' ? body.description : '';
     const category = typeof body.category === 'string' ? body.category.trim() || null : null;
+    const image = typeof body.image === 'string' ? body.image.trim() || null : null;
 
     const event = await prisma.event.create({
       data: {
@@ -65,6 +66,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
         description,
         location,
         date: eventDate,
+        image,
         latitude,
         longitude,
         category,

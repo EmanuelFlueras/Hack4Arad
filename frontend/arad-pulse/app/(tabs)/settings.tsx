@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,9 +16,37 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import authService, { type UserSession } from '../../services/authService';
 import { apiRequest } from '../../services/api';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+
+const triggerHaptic = async (feedback: () => Promise<void>) => {
+  try {
+    await feedback();
+  } catch (hapticError) {
+    console.warn('Haptic feedback is unavailable:', hapticError);
+  }
+};
+
+const eventImagePresets = [
+  {
+    label: 'Pâine / Tradițional',
+    url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800',
+  },
+  {
+    label: 'Vinuri Miniș',
+    url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=800',
+  },
+  {
+    label: 'Târg / Festival',
+    url: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800',
+  },
+  {
+    label: 'Legume / Macea',
+    url: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=800',
+  },
+];
 
 const lightPalette = {
   background: '#F8FAFC',
@@ -53,6 +82,7 @@ export default function SettingsScreen() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventDescription, setEventDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => new Date(Date.now() + 86400000));
   const [eventLocation, setEventLocation] = useState('');
   const [eventCategory, setEventCategory] = useState('Târg');
@@ -150,18 +180,26 @@ export default function SettingsScreen() {
           date: selectedDate.toISOString(),
           location: eventLocation.trim(),
           category: eventCategory,
+          image: imageUrl.trim() || null,
           creatorId: currentUser.id,
         }),
       });
+      await triggerHaptic(() =>
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+      );
       setShowEventModal(false);
       setEventTitle('');
       setEventDescription('');
+      setImageUrl('');
       setSelectedDate(new Date(Date.now() + 86400000));
       setEventLocation('');
       setEventCategory('Târg');
       Alert.alert('Publicare reușită', 'Evenimentul a fost publicat cu succes!');
       router.push('/eventsscreen');
     } catch (requestError: unknown) {
+      await triggerHaptic(() =>
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
+      );
       setEventError(
         requestError instanceof Error ? requestError.message : 'Nu s-a putut publica evenimentul.',
       );
@@ -217,6 +255,9 @@ export default function SettingsScreen() {
             isDarkMode={isDarkMode}
             onEditPress={openEditModal}
             onAddEvent={() => {
+              void triggerHaptic(() =>
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+              );
               setEventError(null);
               setShowEventModal(true);
             }}
@@ -251,6 +292,7 @@ export default function SettingsScreen() {
         palette={palette}
         title={eventTitle}
         description={eventDescription}
+        imageUrl={imageUrl}
         selectedDate={selectedDate}
         location={eventLocation}
         category={eventCategory}
@@ -258,6 +300,7 @@ export default function SettingsScreen() {
         isSubmitting={isSubmittingEvent}
         onChangeTitle={setEventTitle}
         onChangeDescription={setEventDescription}
+        onChangeImageUrl={setImageUrl}
         onChangeDate={setSelectedDate}
         onChangeLocation={setEventLocation}
         onChangeCategory={setEventCategory}
@@ -554,6 +597,7 @@ function EventCreateModal({
   palette,
   title,
   description,
+  imageUrl,
   selectedDate,
   location,
   category,
@@ -561,6 +605,7 @@ function EventCreateModal({
   isSubmitting,
   onChangeTitle,
   onChangeDescription,
+  onChangeImageUrl,
   onChangeDate,
   onChangeLocation,
   onChangeCategory,
@@ -571,6 +616,7 @@ function EventCreateModal({
   palette: Palette;
   title: string;
   description: string;
+  imageUrl: string;
   selectedDate: Date;
   location: string;
   category: string;
@@ -578,6 +624,7 @@ function EventCreateModal({
   isSubmitting: boolean;
   onChangeTitle: (value: string) => void;
   onChangeDescription: (value: string) => void;
+  onChangeImageUrl: (value: string) => void;
   onChangeDate: (value: Date) => void;
   onChangeLocation: (value: string) => void;
   onChangeCategory: (value: string) => void;
@@ -611,6 +658,9 @@ function EventCreateModal({
     }
     if (!date) return;
 
+    void triggerHaptic(() =>
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+    );
     onChangeDate(date);
     if (pickerMode === 'date') {
       setPickerMode('time');
@@ -678,7 +728,12 @@ function EventCreateModal({
                       value: toLocalDateTimeValue(selectedDate),
                       onChange: (event) => {
                         const nextDate = new Date(event.currentTarget.value);
-                        if (!Number.isNaN(nextDate.getTime())) onChangeDate(nextDate);
+                        if (!Number.isNaN(nextDate.getTime())) {
+                          void triggerHaptic(() =>
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+                          );
+                          onChangeDate(nextDate);
+                        }
                       },
                       style: {
                         position: 'absolute',
@@ -695,6 +750,9 @@ function EventCreateModal({
                     accessibilityRole="button"
                     style={styles.datePickerButton}
                     onPress={() => {
+                      void triggerHaptic(() =>
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+                      );
                       setPickerMode('date');
                       setShowDatePicker(true);
                     }}
@@ -733,6 +791,68 @@ function EventCreateModal({
                 placeholder="Piața Avram Iancu, Arad"
                 palette={palette}
               />
+
+              <View style={styles.eventField}>
+                <Text style={[styles.fieldLabel, { color: palette.text }]}>
+                  URL Imagine (opțional)
+                </Text>
+                <TextInput
+                  accessibilityLabel="URL Imagine (opțional)"
+                  value={imageUrl}
+                  onChangeText={onChangeImageUrl}
+                  placeholder="https://..."
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  style={[
+                    styles.eventInput,
+                    {
+                      backgroundColor: palette.input,
+                      borderColor: palette.border,
+                      color: palette.text,
+                    },
+                  ]}
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.imagePresetRow}
+                >
+                  {eventImagePresets.map((preset) => (
+                    <TouchableOpacity
+                      key={preset.label}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Alege imagine: ${preset.label}`}
+                      accessibilityState={{ selected: imageUrl === preset.url }}
+                      style={[
+                        styles.imagePresetChip,
+                        { borderColor: palette.border, backgroundColor: palette.subtle },
+                        imageUrl === preset.url && styles.selectedEventCategoryChip,
+                      ]}
+                      onPress={() => onChangeImageUrl(preset.url)}
+                    >
+                      <Text
+                        style={[
+                          styles.imagePresetText,
+                          { color: palette.muted },
+                          imageUrl === preset.url && styles.selectedEventCategoryText,
+                        ]}
+                      >
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {imageUrl.trim().length > 0 && (
+                  <Image
+                    accessibilityLabel="Previzualizare imagine eveniment"
+                    source={{ uri: imageUrl.trim() }}
+                    resizeMode="cover"
+                    style={styles.eventImagePreview}
+                  />
+                )}
+              </View>
 
               <Text style={[styles.eventCategoryLabel, { color: palette.text }]}>Categorie</Text>
               <View style={styles.eventCategoryRow}>
@@ -1269,6 +1389,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     fontSize: 14,
+  },
+  imagePresetRow: {
+    gap: 7,
+    paddingVertical: 2,
+  },
+  imagePresetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderRadius: 18,
+  },
+  imagePresetText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  eventImagePreview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 10,
+    backgroundColor: '#E2E8F0',
   },
   eventDescriptionInput: {
     minHeight: 92,

@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { eventService, BackendEvent } from '../../services/eventService';
 
@@ -42,6 +44,28 @@ function formatEventDate(dateValue: string | Date | undefined): string {
     minute: '2-digit',
   });
 }
+
+const triggerHaptic = async (feedback: Promise<void>) => {
+  try {
+    await feedback;
+  } catch (error) {
+    console.warn('Haptic feedback is unavailable:', error);
+  }
+};
+
+const handleShare = async (event: any) => {
+  try {
+    await triggerHaptic(
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+    );
+    await Share.share({
+      title: event.title,
+      message: `Hai la ${event.title} (${event.location})! Descoperă evenimentele și producătorii locali pe Arad Pulse.`,
+    });
+  } catch (error) {
+    console.log('Error sharing:', error);
+  }
+};
 
 export default function EventsScreen() {
   const [events, setEvents] = useState<BackendEvent[]>([]);
@@ -214,6 +238,9 @@ export default function EventsScreen() {
             markingType={'custom'}
             markedDates={markedDates}
             onDayPress={(day: { dateString: string }) => {
+              void triggerHaptic(
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+              );
               if (selectedDate === day.dateString) {
                 setSelectedDate('');
               } else {
@@ -232,7 +259,12 @@ export default function EventsScreen() {
           {selectedDate !== '' && (
             <TouchableOpacity
               style={styles.clearDateButton}
-              onPress={() => setSelectedDate('')}
+              onPress={() => {
+                void triggerHaptic(
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+                );
+                setSelectedDate('');
+              }}
             >
               <Text style={styles.clearDateText}>Resetează selecția zilei</Text>
             </TouchableOpacity>
@@ -256,6 +288,9 @@ export default function EventsScreen() {
                 key={filterKey}
                 style={[styles.filterChip, isActive && styles.activeChip]}
                 onPress={() => {
+                  void triggerHaptic(
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+                  );
                   setSelectedDate('');
                   setFilter(filterKey);
                 }}
@@ -306,12 +341,26 @@ export default function EventsScreen() {
                     </View>
                   </View>
 
-                  {avgRating && (
-                    <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={14} color="#F59E0B" />
-                      <Text style={styles.ratingText}>{avgRating}</Text>
-                    </View>
-                  )}
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity
+                      onPress={() => handleShare(item)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Distribuie evenimentul ${item.title}`}
+                    >
+                      <Ionicons
+                        name="share-social-outline"
+                        size={20}
+                        color="#64748B"
+                      />
+                    </TouchableOpacity>
+                    {avgRating && (
+                      <View style={styles.ratingBadge}>
+                        <Ionicons name="star" size={14} color="#F59E0B" />
+                        <Text style={styles.ratingText}>{avgRating}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
 
                 <Text style={styles.eventDescription}>{item.description}</Text>
@@ -335,6 +384,7 @@ export default function EventsScreen() {
                           accessibilityLabel={`Vezi ${partner.name} pe hartă`}
                           style={styles.partnerTag}
                           onPress={() => {
+                            void triggerHaptic(Haptics.selectionAsync());
                             const isMinis = partner.location?.includes('Miniș') ?? false;
                             router.push({
                               pathname: '/map',
@@ -526,6 +576,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   titleWrap: {
     flex: 1,

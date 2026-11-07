@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { apiRequest } from '../../services/api';
 
@@ -33,6 +34,14 @@ const categories = [
   'Tradițional',
   'Apicultură',
 ];
+
+const triggerImpact = async (style: Haptics.ImpactFeedbackStyle) => {
+  try {
+    await Haptics.impactAsync(style);
+  } catch (error) {
+    console.warn('Haptic feedback is unavailable:', error);
+  }
+};
 
 export default function ProducersScreen() {
   const [producers, setProducers] = useState<Producer[]>([]);
@@ -181,7 +190,10 @@ export default function ProducersScreen() {
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
               style={[styles.filterChip, isActive && styles.activeFilterChip]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => {
+                void triggerImpact(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedCategory(category);
+              }}
             >
               <Text style={[styles.filterText, isActive && styles.activeFilterText]}>
                 {category}
@@ -207,9 +219,25 @@ export default function ProducersScreen() {
         </View>
       ) : (
         filteredProducers.map((producer) => (
-          <View key={producer.id} style={styles.producerCard}>
+          <TouchableOpacity
+            key={producer.id}
+            style={styles.producerCard}
+            activeOpacity={1}
+            onPress={() =>
+              void triggerImpact(Haptics.ImpactFeedbackStyle.Medium)
+            }
+          >
             <View style={styles.cardHeader}>
-              <Text style={styles.producerName}>{producer.name}</Text>
+              <View style={styles.producerTitleRow}>
+                <Text style={styles.producerName}>{producer.name}</Text>
+                <Ionicons name="checkmark-circle" size={18} color="#059669" />
+              </View>
+              <View style={styles.traditionalBadge}>
+                <Ionicons name="ribbon-outline" size={13} color="#065F46" />
+                <Text style={styles.traditionalBadgeText}>
+                  Atestat Tradițional Arad
+                </Text>
+              </View>
               <View style={styles.categoryBadge}>
                 <Text style={styles.categoryText}>
                   {producer.category?.trim() || 'Producător Local'}
@@ -236,7 +264,8 @@ export default function ProducersScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Vezi ${producer.name} pe hartă`}
                 style={[styles.actionButton, styles.mapButton]}
-                onPress={() =>
+                onPress={() => {
+                  void triggerImpact(Haptics.ImpactFeedbackStyle.Medium);
                   router.push({
                     pathname: '/map',
                     params: {
@@ -249,14 +278,14 @@ export default function ProducersScreen() {
                         (producer.location?.includes('Miniș') ? 21.6142 : 21.3123),
                       title: producer.name,
                     },
-                  })
-                }
+                  });
+                }}
               >
                 <Ionicons name="map-outline" size={17} color="#047857" />
                 <Text style={styles.mapButtonText}>Vezi pe Hartă</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         ))
       )}
     </ScrollView>
@@ -378,11 +407,30 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'flex-start',
   },
+  producerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   producerName: {
     color: '#0F172A',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '800',
+  },
+  traditionalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+    backgroundColor: '#ECFDF5',
+  },
+  traditionalBadgeText: {
+    color: '#065F46',
+    fontSize: 11,
+    fontWeight: '600',
   },
   categoryBadge: {
     alignSelf: 'flex-start',
