@@ -1,80 +1,102 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
+
+interface MapPoint {
+  id: string;
+  title: string;
+  type: 'PRODUCER' | 'EVENT';
+  latitude: number;
+  longitude: number;
+  category?: string;
+  address?: string;
+  description?: string;
+}
+
+interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
+interface OptionalProducerMapFields {
+  email?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+const fallbackCoordinates: Record<string, Coordinates> = {
+  arad: { latitude: 46.1866, longitude: 21.3123 },
+  pecica: { latitude: 46.1697, longitude: 21.0714 },
+  minis: { latitude: 46.1511, longitude: 21.6133 },
+  lipova: { latitude: 46.0931, longitude: 21.6914 },
+  macea: { latitude: 46.3889, longitude: 21.3117 },
+};
+
+function getFallbackCoordinates(value: string): Coordinates {
+  const normalized = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  for (const town of ['pecica', 'minis', 'lipova', 'macea']) {
+    if (normalized.includes(town)) {
+      return fallbackCoordinates[town];
+    }
+  }
+
+  return fallbackCoordinates.arad;
+}
 
 router.get('/points', async (_req, res) => {
-  console.log('>>> [BACKEND] Cerere primita pe /points!');
   try {
-    console.log('>>> [BACKEND] Caut producatori...');
-    const producers = await prisma.user.findMany({
-      where: {
-        role: 'PRODUCER',
-        status: 'APPROVED',
-      },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        location: true,
-        category: true,
-        latitude: true,
-        longitude: true,
-      },
-    });
-    console.log(`>>> [BACKEND] Gasit ${producers.length} producatori.`);
+    const [producers, events] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'PRODUCER', status: 'APPROVED' },
+      }),
+      prisma.event.findMany({
+        select: { id: true, title: true, location: true, description: true },
+      }),
+    ]);
 
-    console.log('>>> [BACKEND] Caut evenimente...');
-    const events = await prisma.event.findMany({
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        location: true,
-        image: true,
-        date: true,
-        latitude: true,
-        longitude: true,
-      },
-    });
-    console.log(`>>> [BACKEND] Gasit ${events.length} evenimente.`);
+    const points: MapPoint[] = [
+      ...producers.map((record) => {
+        const producer = record as typeof record & OptionalProducerMapFields;
+        const latitude = producer.latitude;
+        const longitude = producer.longitude;
+        const coordinates =
+          typeof latitude === 'number' &&
+          Number.isFinite(latitude) &&
+          typeof longitude === 'number' &&
+          Number.isFinite(longitude)
+            ? { latitude, longitude }
+            : getFallbackCoordinates(producer.location);
 
-    const points = [
-      ...events
-        .filter((e) => e.latitude !== null && e.longitude !== null)
-        .map((e) => ({
-          id: `event-${e.id}`,
-          originalId: e.id,
-          type: 'EVENT' as const,
-          title: e.title,
-          subtitle: e.location,
-          description: e.description,
-          image: e.image,
-          date: e.date,
-          latitude: e.latitude!,
-          longitude: e.longitude!,
-        })),
-      ...producers
-        .filter((p) => p.latitude !== null && p.longitude !== null)
-        .map((p) => ({
-          id: `producer-${p.id}`,
-          originalId: p.id,
+        return {
+          id: producer.id,
+          title: producer.name,
           type: 'PRODUCER' as const,
-          title: p.name,
-          subtitle: p.category || 'Producător Local',
-          description: p.location,
-          phone: p.phone,
-          latitude: p.latitude!,
-          longitude: p.longitude!,
-        })),
+          ...coordinates,
+          category: producer.category || 'Producător Local',
+          address: producer.location,
+          description: `Contact: ${producer.phone || producer.email || 'Nespecificat'}`,
+        };
+      }),
+      ...events.map((event) => ({
+        id: `event-${event.id}`,
+        title: event.title,
+        type: 'EVENT' as const,
+        ...getFallbackCoordinates(`${event.title} ${event.location}`),
+        category: undefined,
+        address: event.location,
+        description: event.description,
+      })),
     ];
 
-    console.log(`>>> [BACKEND] Trimit raspunsul cu ${points.length} puncte.`);
     return res.json(points);
   } catch (error) {
-    console.error('>>> [BACKEND EROARE]:', error);
-    return res.status(500).json({ error: String(error) });
+    console.error('Failed to fetch map points:', error);
+    return res.status(500).json({ error: 'Could not fetch map points.' });
   }
 });
 

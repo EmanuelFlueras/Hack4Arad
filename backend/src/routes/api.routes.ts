@@ -5,6 +5,7 @@ import { getEvents, createEvent } from '../controllers/event.controller';
 import { getProducers } from '../controllers/producer.controller';
 import { addReview } from '../controllers/review.controller';
 import { requireAuth, requireRole, optionalAuth } from '../middlewares/auth.middleware';
+import mapRoutes from './map';
 
 const router = Router();
 
@@ -25,5 +26,9 @@ router.get('/producers', getProducers);
 
 // Recenzii (acceptă atât vizitatori anonimi cât și utilizatori logați)
 router.post('/reviews', optionalAuth, addReview);
+
+// Map points
+router.use('/map', mapRoutes);
+router.use(mapRoutes);
 
 export default router;
