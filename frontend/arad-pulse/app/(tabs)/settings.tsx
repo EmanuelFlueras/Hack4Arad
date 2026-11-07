@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -49,10 +50,35 @@ const eventImagePresets = [
   },
 ];
 
+const ARAD_FACTS = [
+  'Pâinea de Pecica a fost atestată documentar încă din secolul al XVI-lea, fiind coaptă și astăzi pe vatră tradițională din cărămidă.',
+  'Podgoria Miniș-Măderat este una dintre cele mai vechi din România, renumită istoric pentru vinul roșu Cadarcă și aszú-ul de Miniș.',
+  'Parcul Natural Lunca Mureșului este o zonă umedă de importanță internațională (sit Ramsar), adăpostind peste 200 de specii de păsări protejate.',
+  'Cetatea Șoimoș a fost ridicată spre sfârșitul secolului al XIII-lea de către familii nobiliare pentru a supraveghea defileul Mureșului.',
+  'Palatul Cultural din Arad găzduiește una dintre cele mai apreciate filarmonici din vestul țării și include elemente de stil neoclasic, corintic și renascentist.',
+];
+
+const PASSPORT_QR_PATTERN = [
+  '1111101011111',
+  '1000101010001',
+  '1010101110101',
+  '1010101000101',
+  '1111101011111',
+  '0000000100000',
+  '1101011110101',
+  '0110110011010',
+  '1011101100111',
+  '0000000101100',
+  '1111101101011',
+  '1000100110010',
+  '1111101011101',
+];
+
 export default function SettingsScreen() {
   const { isDark, toggleTheme, colors } = useTheme();
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [passportVisible, setPassportVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [editPhone, setEditPhone] = useState('');
   const [editLocation, setEditLocation] = useState('');
@@ -78,6 +104,19 @@ export default function SettingsScreen() {
     border: colors.border,
     subtle: colors.inputBg,
     input: colors.card,
+  };
+
+  const sharePassport = async () => {
+    try {
+      await Share.share({
+        title: 'Pașaport Digital de Târg - Arad Pulse',
+        message:
+          'Sunt Susținător al Tradițiilor Locale! Descoperă târgurile și producătorii locali din județul Arad cu Arad Pulse.',
+      });
+    } catch (shareError) {
+      console.error('Could not share the Arad Pulse passport:', shareError);
+      Alert.alert('Distribuire indisponibilă', 'Ecusonul nu a putut fi distribuit.');
+    }
   };
 
   useFocusEffect(
@@ -212,7 +251,21 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.pageHeader}>
-          <Text style={[styles.pageTitle, { color: '#DC2626' }]}>Setări & Cont</Text>
+          <View style={styles.pageHeaderTop}>
+            <Text style={[styles.pageTitle, { color: '#DC2626' }]}>Setări & Cont</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Deschide Pașaportul Digital de Târg"
+              style={[
+                styles.passportTrigger,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+              onPress={() => setPassportVisible(true)}
+            >
+              <Ionicons name="ribbon-outline" size={18} color={colors.primary} />
+              <Text style={[styles.passportTriggerText, { color: colors.primary }]}>Pașaport</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.pageSubtitle, { color: palette.muted }]}>HACK 4 ARAD</Text>
         </View>
 
@@ -298,6 +351,89 @@ export default function SettingsScreen() {
         onClose={() => setShowEventModal(false)}
         onSubmit={() => void handleCreateEvent()}
       />
+      <Modal
+        visible={passportVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPassportVisible(false)}
+      >
+        <View style={styles.passportBackdrop}>
+          <View
+            style={[
+              styles.passportModal,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.passportModalHeader}>
+              <View style={styles.passportBrand}>
+                <View style={[styles.passportBrandIcon, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="pulse" size={20} color="#FFFFFF" />
+                </View>
+                <View>
+                  <Text style={[styles.passportBrandName, { color: colors.text }]}>ARAD PULSE</Text>
+                  <Text style={[styles.passportBrandCaption, { color: colors.subtext }]}>
+                    PAȘAPORT DIGITAL DE TÂRG
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Închide pașaportul digital"
+                style={[styles.passportClose, { backgroundColor: colors.inputBg }]}
+                onPress={() => setPassportVisible(false)}
+              >
+                <Ionicons name="close" size={21} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View
+              style={[
+                styles.passportBadge,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <View style={[styles.passportSeal, { backgroundColor: colors.primary }]}>
+                <Ionicons name="leaf-outline" size={22} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.passportTitle, { color: colors.text }]}>
+                Susținător al Tradițiilor Locale
+              </Text>
+              <Text style={[styles.passportInstruction, { color: colors.subtext }]}>
+                Arată acest ecran la standurile atestate din județ pentru degustări de bun venit
+              </Text>
+
+              <View
+                accessibilityLabel="Cod QR demonstrativ"
+                style={styles.qrPlaceholder}
+              >
+                {PASSPORT_QR_PATTERN.map((row, rowIndex) => (
+                  <View key={`qr-row-${rowIndex}`} style={styles.qrRow}>
+                    {Array.from(row).map((cell, cellIndex) => (
+                      <View
+                        key={`qr-cell-${rowIndex}-${cellIndex}`}
+                        style={[
+                          styles.qrCell,
+                          { backgroundColor: cell === '1' ? '#0F172A' : '#FFFFFF' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </View>
+              <Text style={[styles.qrCaption, { color: colors.subtext }]}>ECUSON DEMONSTRATIV</Text>
+            </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={[styles.passportShareButton, { backgroundColor: colors.primary }]}
+              onPress={() => void sharePassport()}
+            >
+              <Ionicons name="share-social-outline" size={19} color="#FFFFFF" />
+              <Text style={styles.passportShareText}>Share ecuson</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -349,6 +485,7 @@ function GuestView({
       </View>
 
       <PreferencesCard isDark={isDark} toggleTheme={toggleTheme} colors={colors} />
+      <AradFactCard colors={colors} />
 
       <View style={styles.appInfo}>
         <Text style={[styles.appInfoTitle, { color: palette.muted }]}>Arad Pulse</Text>
@@ -431,6 +568,7 @@ function LoggedInView({
       </View>
 
       <PreferencesCard isDark={isDark} toggleTheme={toggleTheme} colors={colors} />
+      <AradFactCard colors={colors} />
 
       <TouchableOpacity
         accessibilityRole="button"
@@ -458,6 +596,44 @@ function ProfileInfoRow({
       <Ionicons name={icon} size={17} color={color} />
       <Text style={[styles.profileInfoText, { color }]}>{value}</Text>
     </View>
+  );
+}
+
+function AradFactCard({ colors }: { colors: ThemeColors }) {
+  const [factIndex, setFactIndex] = useState(0);
+
+  const nextFact = () => {
+    void triggerHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+    setFactIndex((currentIndex) => (currentIndex + 1) % ARAD_FACTS.length);
+  };
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel="Afișează altă curiozitate despre patrimoniul Aradului"
+      activeOpacity={0.85}
+      onPress={nextFact}
+      style={[
+        styles.factCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
+      <View style={styles.factHeader}>
+        <View style={styles.factHeading}>
+          <Ionicons name="bulb-outline" size={20} color={colors.primary} />
+          <Text style={[styles.factEyebrow, { color: colors.primary }]}>
+            ȘTIAI CĂ? • PATRIMONIU ARAD
+          </Text>
+        </View>
+        <View style={styles.factRefresh}>
+          <Text style={[styles.factRefreshText, { color: colors.subtext }]}>
+            Altă curiozitate
+          </Text>
+          <Ionicons name="sync-outline" size={14} color={colors.subtext} />
+        </View>
+      </View>
+      <Text style={[styles.factText, { color: colors.text }]}>{ARAD_FACTS[factIndex]}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -993,10 +1169,142 @@ const styles = StyleSheet.create({
   pageHeader: {
     marginBottom: 18,
   },
+  pageHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   pageTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#DC2626',
+  },
+  passportTrigger: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  passportTriggerText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  passportBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 22,
+    backgroundColor: '#0F172A99',
+  },
+  passportModal: {
+    width: '100%',
+    maxWidth: 430,
+    padding: 20,
+    borderRadius: 24,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  passportModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  passportBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  passportBrandIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+  },
+  passportBrandName: {
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  passportBrandCaption: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  passportClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+  },
+  passportBadge: {
+    alignItems: 'center',
+    padding: 18,
+    borderRadius: 19,
+    borderWidth: 1,
+  },
+  passportSeal: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    marginBottom: 12,
+  },
+  passportTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  passportInstruction: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  qrPlaceholder: {
+    padding: 9,
+    marginTop: 17,
+    borderRadius: 8,
+  },
+  qrRow: {
+    flexDirection: 'row',
+    gap: 1,
+  },
+  qrCell: {
+    width: 6,
+    height: 6,
+  },
+  qrCaption: {
+    marginTop: 7,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+  },
+  passportShareButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    borderRadius: 13,
+  },
+  passportShareText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   pageSubtitle: {
     marginTop: 4,
@@ -1015,6 +1323,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.045,
     shadowRadius: 7,
     elevation: 2,
+  },
+  factCard: {
+    padding: 16,
+    marginVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  factHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  factHeading: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  factEyebrow: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  factRefresh: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  factRefreshText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  factText: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
   },
   cardHeadingRow: {
     flexDirection: 'row',

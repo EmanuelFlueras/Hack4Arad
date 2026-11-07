@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -86,6 +86,10 @@ const handleShare = async (event: any) => {
 
 export default function EventsScreen() {
   const { colors, isDark } = useTheme();
+  const [weather, setWeather] = useState<{ temp: number; desc: string }>({
+    temp: 8,
+    desc: 'Răcoros, ideal pentru târguri și vizite',
+  });
   const [events, setEvents] = useState<BackendEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<BackendEvent | null>(null);
   const [impressionDraft, setImpressionDraft] = useState('');
@@ -98,6 +102,35 @@ export default function EventsScreen() {
   const [selectedDay, setSelectedDay] = useState<string>('');
   const [refreshing, setRefreshing] = useState(false);
   const [showCalendar, setShowCalendar] = useState(true);
+
+  useEffect(() => {
+    const fetchAradWeather = async () => {
+      try {
+        const response = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=46.1866&longitude=21.3123&current=temperature_2m,weather_code&timezone=auto',
+        );
+        if (!response.ok) {
+          throw new Error(`Open-Meteo request failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        const temperature = data?.current?.temperature_2m;
+        if (typeof temperature === 'number' && Number.isFinite(temperature)) {
+          const temp = Math.round(temperature);
+          const desc =
+            temp < 12
+              ? 'Răcoros • Ideal pentru târguri și pivnițe'
+              : 'Timp favorabil pentru evenimente locale';
+          setWeather({ temp, desc });
+        }
+      } catch (weatherError) {
+        console.warn('Could not fetch Arad weather; using fallback:', weatherError);
+        setWeather({ temp: 8, desc: 'Răcoros, bun de explorat' });
+      }
+    };
+
+    void fetchAradWeather();
+  }, []);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -270,6 +303,31 @@ export default function EventsScreen() {
         />
       }
     >
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Prognoza vremii în județul Arad"
+        activeOpacity={0.8}
+        style={[
+          styles.weatherChip,
+          {
+            backgroundColor: isDark ? '#1E293B' : '#FEF2F2',
+            borderColor: isDark ? '#334155' : '#FCA5A5',
+          },
+        ]}
+        onPress={() => {
+          void triggerHaptic(Haptics.selectionAsync());
+          Alert.alert(
+            'Prognoză Weekend Arad',
+            `${weather.temp}°C • ${weather.desc}. Condiții bune pentru evenimente în aer liber, podgorii și târguri locale.`,
+          );
+        }}
+      >
+        <Ionicons name="cloudy-outline" size={16} color="#F59E0B" />
+        <Text style={[styles.weatherChipText, { color: isDark ? '#F1F5F9' : '#991B1B' }]}>
+          Arad • {weather.temp}°C • {weather.desc}
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityLabel="Deschide planificatorul de weekend"
@@ -731,6 +789,21 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 32,
+  },
+  weatherChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  weatherChipText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
   },
   plannerBanner: {
     padding: 16,
