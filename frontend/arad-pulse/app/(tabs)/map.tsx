@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -9,10 +10,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import type { Region } from 'react-native-maps';
 import { MapPoint, mapService } from '../../services/mapService';
 
 type PointFilter = 'ALL' | 'EVENT' | 'PRODUCER';
+type UserLocation = { latitude: number; longitude: number };
+
+const ARAD_CENTER: UserLocation = { latitude: 46.1866, longitude: 21.3123 };
 
 const INITIAL_REGION: Region = {
   latitude: 46.1866,
@@ -29,6 +34,7 @@ const filters: { key: PointFilter; label: string }[] = [
 
 export default function MapScreen() {
   const [points, setPoints] = useState<MapPoint[]>([]);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [filter, setFilter] = useState<PointFilter>('ALL');
   const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,11 +60,44 @@ export default function MapScreen() {
     void loadPoints();
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+
+    const loadUserLocation = async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted) return;
+
+        const location = await Location.getCurrentPositionAsync({});
+        if (isActive) {
+          setUserLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+        }
+      } catch {
+        if (isActive) setUserLocation(null);
+      }
+    };
+
+    void loadUserLocation();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const filteredPoints = points.filter((point) => filter === 'ALL' || point.type === filter);
 
   const selectFilter = (nextFilter: PointFilter) => {
     setFilter(nextFilter);
     setSelectedPoint(null);
+  };
+
+  const openNavigation = (point: MapPoint) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`;
+    void Linking.openURL(url).catch((navigationError: unknown) => {
+      console.error('Could not open directions:', navigationError);
+    });
   };
 
   if (loading) {
@@ -88,18 +127,22 @@ export default function MapScreen() {
       points={filteredPoints}
       allPoints={points}
       filter={filter}
+      userLocation={userLocation}
       selectedPoint={selectedPoint}
       onFilterChange={selectFilter}
       onPointSelect={setSelectedPoint}
+      onNavigate={openNavigation}
       onClosePreview={() => setSelectedPoint(null)}
     />
   ) : (
     <NativePointsMap
       points={filteredPoints}
       filter={filter}
+      userLocation={userLocation}
       selectedPoint={selectedPoint}
       onFilterChange={selectFilter}
       onPointSelect={setSelectedPoint}
+      onNavigate={openNavigation}
       onClosePreview={() => setSelectedPoint(null)}
     />
   );
@@ -108,9 +151,11 @@ export default function MapScreen() {
 interface MapViewProps {
   points: MapPoint[];
   filter: PointFilter;
+  userLocation: UserLocation | null;
   selectedPoint: MapPoint | null;
   onFilterChange: (filter: PointFilter) => void;
   onPointSelect: (point: MapPoint) => void;
+  onNavigate: (point: MapPoint) => void;
   onClosePreview: () => void;
 }
 
@@ -118,9 +163,11 @@ function WebPointsList({
   points,
   allPoints,
   filter,
+  userLocation,
   selectedPoint,
   onFilterChange,
   onPointSelect,
+  onNavigate,
   onClosePreview,
 }: MapViewProps & { allPoints: MapPoint[] }) {
   return (
@@ -155,7 +202,13 @@ function WebPointsList({
       </ScrollView>
 
       {selectedPoint && (
-        <PointPreview point={selectedPoint} onClose={onClosePreview} style={styles.webPreview} />
+        <PointPreview
+          point={selectedPoint}
+          userLocation={userLocation}
+          onClose={onClosePreview}
+          onNavigate={() => onNavigate(selectedPoint)}
+          style={styles.webPreview}
+        />
       )}
     </View>
   );
@@ -164,9 +217,11 @@ function WebPointsList({
 function NativePointsMap({
   points,
   filter,
+  userLocation,
   selectedPoint,
   onFilterChange,
   onPointSelect,
+  onNavigate,
   onClosePreview,
 }: MapViewProps) {
   const { default: MapView, Marker } = require('react-native-maps') as typeof import('react-native-maps');
@@ -219,7 +274,9 @@ function NativePointsMap({
       {selectedPoint && (
         <PointPreview
           point={selectedPoint}
+          userLocation={userLocation}
           onClose={onClosePreview}
+          onNavigate={() => onNavigate(selectedPoint)}
           style={styles.nativePreview}
         />
       )}
@@ -295,13 +352,24 @@ function PointCard({
 
 function PointPreview({
   point,
+  userLocation,
   onClose,
+  onNavigate,
   style,
 }: {
   point: MapPoint;
+  userLocation: UserLocation | null;
   onClose: () => void;
+  onNavigate: () => void;
   style: object;
 }) {
+  const distance = calculateDistance(
+    userLocation?.latitude ?? ARAD_CENTER.latitude,
+    userLocation?.longitude ?? ARAD_CENTER.longitude,
+    point.latitude,
+    point.longitude,
+  );
+
   return (
     <View style={[styles.previewCard, style]}>
       <View style={styles.previewHeader}>
@@ -321,6 +389,16 @@ function PointPreview({
         </TouchableOpacity>
       </View>
 
+      <View style={styles.distancePill}>
+        <Ionicons name="navigate-circle-outline" size={17} color="#0284C7" />
+        <Text style={styles.distanceText}>
+          {distance} {userLocation ? 'de tine' : 'de centrul Aradului'}
+        </Text>
+      </View>
+      {!userLocation && (
+        <Text style={styles.distanceNote}>Distanță estimată față de centrul Aradului.</Text>
+      )}
+
       <View style={styles.previewCategory}>
         <Text style={styles.categoryTagText}>{getCategoryLabel(point)}</Text>
       </View>
@@ -333,8 +411,33 @@ function PointPreview({
       <Text style={styles.previewDescription}>
         {point.description || 'Nu există o descriere disponibilă.'}
       </Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        style={[
+          styles.navigateButton,
+          point.type === 'PRODUCER' ? styles.navigateProducerButton : styles.navigateEventButton,
+        ]}
+        onPress={onNavigate}
+      >
+        <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
+        <Text style={styles.navigateButtonText}>Navighează</Text>
+      </TouchableOpacity>
     </View>
   );
+}
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): string {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = radians(lat2 - lat1);
+  const longitudeDelta = radians(lon2 - lon1);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(radians(lat1)) *
+      Math.cos(radians(lat2)) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+
+  return distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`;
 }
 
 function PointTypeBadge({ type }: { type: MapPoint['type'] }) {
@@ -708,5 +811,46 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 13,
     lineHeight: 18,
+  },
+  distancePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 11,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#E0F2FE',
+  },
+  distanceText: {
+    color: '#0369A1',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  distanceNote: {
+    marginTop: 4,
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  navigateButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 13,
+    borderRadius: 11,
+  },
+  navigateProducerButton: {
+    backgroundColor: '#059669',
+  },
+  navigateEventButton: {
+    backgroundColor: '#C82333',
+  },
+  navigateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
