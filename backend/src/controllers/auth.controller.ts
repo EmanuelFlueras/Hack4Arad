@@ -5,48 +5,58 @@ import { prisma } from '../config/prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'arad_pulse_secret_key_2025';
 
-// 1. Înregistrare Producător sau Instituție (contul pornește ca PENDING)
 export const register = async (req: Request, res: Response) => {
   try {
-    const { name, phone, password, location, role } = req.body;
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const location = typeof req.body?.location === 'string' ? req.body.location.trim() : '';
+    const category = typeof req.body?.category === 'string' ? req.body.category.trim() : null;
 
     if (!name || !phone || !password || !location) {
-      return res.status(400).json({ error: 'Toate campurile sunt obligatorii.' });
+      return res.status(400).json({ error: 'Numele, telefonul, parola și locația sunt obligatorii.' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { phone } });
     if (existingUser) {
-      return res.status(400).json({ error: 'Exista deja un cont cu acest numar de telefon.' });
+      return res.status(400).json({ error: 'Numărul de telefon este deja înregistrat.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const assignedRole = role === 'INSTITUTION' ? 'INSTITUTION' : 'PRODUCER';
+    const assignedRole = req.body?.role === 'INSTITUTION' ? 'INSTITUTION' : 'PRODUCER';
 
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         name,
         phone,
         password: hashedPassword,
         location,
+        category: category || null,
         role: assignedRole,
-        status: 'PENDING', // Așteaptă aprobarea administratorului
+        status: 'PENDING',
       },
-      select: { id: true, name: true, phone: true, role: true, status: true },
     });
 
-    res.status(201).json({
-      message: 'Cererea de cont a fost inregistrata. Vei putea intra dupa aprobarea administratorului.',
-      user,
+    return res.status(201).json({
+      message: 'Cererea ta a fost trimisă. Administratorul o va analiza pentru aprobare.',
     });
   } catch (error) {
-    res.status(500).json({ error: 'Eroare la inregistrare.' });
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+      return res.status(400).json({ error: 'Numărul de telefon este deja înregistrat.' });
+    }
+    console.error('Registration failed:', error);
+    return res.status(500).json({ error: 'Eroare la înregistrare.' });
   }
 };
 
-// 2. Autentificare (doar conturile APPROVED se pot loga)
 export const login = async (req: Request, res: Response) => {
   try {
-    const { phone, password } = req.body;
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (!phone || !password) {
+      return res.status(400).json({ error: 'Numărul de telefon și parola sunt obligatorii.' });
+    }
 
     const user = await prisma.user.findUnique({ where: { phone } });
     if (!user) {
@@ -58,32 +68,35 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Date de autentificare incorecte.' });
     }
 
-    // Verificare aprobare admin
     if (user.status === 'PENDING') {
-      return res.status(403).json({ error: 'Contul tau este inca in curs de aprobare de catre administrator.' });
+      return res.status(403).json({ error: 'Contul tău este în curs de verificare de către administrator.' });
     }
     if (user.status === 'REJECTED') {
-      return res.status(403).json({ error: 'Cererea ta de cont a fost respinsa.' });
+      return res.status(403).json({ error: 'Cererea de înrolare a fost respinsă.' });
+    }
+    if (user.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Contul tău nu este aprobat.' });
     }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, name: user.name },
+      { id: user.id, phone: user.phone, role: user.role },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.json({
-      message: 'Autentificare reusita.',
+    return res.status(200).json({
       token,
       user: {
         id: user.id,
         name: user.name,
-        role: user.role,
         phone: user.phone,
         location: user.location,
+        category: user.category,
+        role: user.role,
       },
     });
   } catch (error) {
-    res.status(500).json({ error: 'Eroare la autentificare.' });
+    console.error('Login failed:', error);
+    return res.status(500).json({ error: 'Eroare la autentificare.' });
   }
 };
